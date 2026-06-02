@@ -6,7 +6,7 @@
 export const SERVER_INSTRUCTIONS = `This server connects to the Stuller jewelry-supply v2 API (catalog, pricing, loose stones, ordering). Authentication uses the user's own Stuller "developer login" via environment variables.
 
 Key things to know:
-- There is NO free-text keyword search on the product catalog. Find products by identifier (get_products by SKU; search_products by series/category) or by faceted filters: call advanced_product_filters first to discover valid facet values (ProductType, MetalQuality, StoneFamily, etc.), then pass them to search_products.
+- Easiest way to find products: find_products — give it a plain-language description (e.g. "white gold diamond stud earrings") and it resolves your words to Stuller's facet vocabulary, runs the search, and reports back what it matched plus any terms it couldn't map. (Stuller's API itself has no raw keyword search, so find_products bridges to structured facets for you.) You can also go manual: get_products by SKU, search_products by series/categoryIds, or advanced_product_filters → search_products. For finished-jewelry categories facets can't express (e.g. "diamond stud earrings" — stone facets don't combine with a finished ProductType), use discover_categories to get a CategoryId, then search_products by it.
 - search_products results carry LIMITED pricing — always re-check chosen SKUs with pricing_availability or product_detail before quoting a customer.
 - Loose stones use dedicated tools, not the product catalog: search_diamonds / search_lab_grown_diamonds (filter by the 4Cs, shape, certification, carat/price ranges) and search_gemstones (colored stones by type/color/shape). Filter values are plain codes/words (color "G", clarity "VS1", shape "Round").
 - submit_order is the only write tool. It defaults to a DRY RUN and returns the order body without sending; it only transmits when called again with confirm: true. Never claim an order was placed unless you called it with confirm: true and got a submitted response.
@@ -20,7 +20,8 @@ This server gives you access to Stuller's catalog, pricing, loose-stone inventor
 You need a Stuller **developer login** (API-only credentials, not your stuller.com website login) set as \`STULLER_USERNAME\` / \`STULLER_PASSWORD\`. If tools return an auth error, the credentials aren't configured.
 
 ## Finding products
-There is **no free-text keyword search**. Two ways to find products:
+
+**Start with \`find_products\`** — describe what you want in plain language ("white gold diamond stud earrings") and it resolves your words to Stuller's facet vocabulary, runs the search, and returns \`resolvedFilters\` (what it matched) + \`unmatchedTerms\` (what it couldn't). It's the natural-language front door. Stuller's API has no raw keyword search of its own, so under the hood everything maps to the structured paths below — which you can also drive directly:
 
 1. **By identifier** — if you know it:
    - \`get_products\` — one or more SKUs (e.g. "309:77802:S")
@@ -28,8 +29,8 @@ There is **no free-text keyword search**. Two ways to find products:
 2. **By faceted filters** — to discover/narrow:
    - \`advanced_product_filters\` — lists the facets you can filter on (ProductType, MetalQuality, StoneFamily, StoneShape, …) and their valid values
    - \`search_products\` — pass a chosen facet as \`advancedProductFilters\`, optionally with \`filter\` flags (InStock, Orderable, OnPriceList, Finished, BestSeller)
-
-   Example: "white-gold diamond stud earrings" → discover facets, then search with ProductType=Earrings + MetalQuality + StoneFamily=Diamond.
+3. **By merchandising category** — for finished jewelry facets can't express (e.g. "diamond stud earrings" — stone facets don't AND with a finished ProductType):
+   - \`discover_categories\` (e.g. \`productType:"Earrings", contains:"stud"\`) → pick a category \`id\` → \`search_products\` with \`categoryIds:[id]\`
 
    Page large result sets with the returned \`nextPage\` token (\`hasMore\` tells you when to stop).
 
@@ -61,9 +62,9 @@ The quote lives in memory for this session only (Stuller has no server-side cart
 - \`submit_order\` — **dry run by default**: it returns the order body it *would* send and transmits nothing. Review it, then call again with \`confirm: true\` to actually place the order. Set \`STULLER_DISABLE_ORDERING=true\` in the environment to hard-disable it.
 
 ## A typical flow
-1. \`advanced_product_filters\` → find valid facet values
-2. \`search_products\` → get candidate SKUs
-3. \`pricing_availability\` / \`product_detail\` → confirm price + stock
-4. (optional) \`submit_order\` dry run → review → \`confirm: true\`
+1. \`find_products\` ("…") → candidates (or advanced_product_filters / discover_categories → search_products if you prefer to drive facets yourself)
+2. \`pricing_availability\` / \`product_detail\` → confirm live price + stock
+3. (optional) \`quote_add_item\` → \`quote_view\` → \`quote_to_order\`
+4. \`submit_order\` dry run → review → \`confirm: true\`
 
 _Not affiliated with or endorsed by Stuller, Inc._`;

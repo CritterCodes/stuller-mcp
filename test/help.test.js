@@ -13,7 +13,7 @@ test('server instructions cover the key behaviors', () => {
 
 test('usage guide covers discovery, stones, ordering, and quotes', () => {
   for (const concept of [
-    'find products',
+    'find_products',
     'advanced_product_filters',
     'search_diamonds',
     'find_stones_by_dimensions',
