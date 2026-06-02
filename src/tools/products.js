@@ -266,7 +266,8 @@ export async function discoverCategories(opts = {}) {
     });
     for (const p of res.products) {
       for (const c of p.webCategories || []) {
-        if (contains && !`${c.name} ${c.path}`.toLowerCase().includes(contains)) continue;
+        // Collect ALL categories; apply `contains` after, so a no-match doesn't
+        // dead-end the caller (we still show what the slice actually contains).
         const cur = counts.get(c.id) || { ...c, productHits: 0 };
         cur.productHits += 1;
         counts.set(c.id, cur);
@@ -277,13 +278,22 @@ export async function discoverCategories(opts = {}) {
     pages += 1;
   } while (nextPage && pages < scanPages);
 
-  const categories = [...counts.values()].sort((a, b) => b.productHits - a.productHits);
-  return {
+  const all = [...counts.values()].sort((a, b) => b.productHits - a.productHits);
+  const matched = contains ? all.filter((c) => `${c.name} ${c.path}`.toLowerCase().includes(contains)) : all;
+
+  const result = {
     scannedProducts: scanned,
-    categoryCount: categories.length,
-    categories,
+    categoryCount: matched.length,
+    categories: matched,
     usage: 'Pass a category `id` to search_products as categoryIds:[id] to browse that merchandising category.',
   };
+  // Don't dead-end on a no-match contains filter — surface what was found so the
+  // caller can still pick (this account tags some product types sparsely).
+  if (contains && !matched.length && all.length) {
+    result.note = `No category matched "${opts.contains}" in the ${scanned} products scanned — this catalog/account may not tag that sub-category. Categories that WERE found are listed under otherCategories; broaden the scan (scanPages) or pick one of these.`;
+    result.otherCategories = all.slice(0, 25);
+  }
+  return result;
 }
 
 // ---- natural-language facet resolver (pure; unit-tested without network) ----

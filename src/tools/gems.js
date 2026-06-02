@@ -152,17 +152,55 @@ function unwrap(payload, listKeys) {
   return { items: [], nextPage: null, total: 0 };
 }
 
+// Lean stone cards keep results under token limits (full stone objects carry
+// every image/video URL). `full: true` returns the complete objects.
+export function diamondCard(t) {
+  return {
+    serialNumber: t.serialNumber,
+    title: t.display?.title ?? null,
+    price: t.price,
+    currency: t.currency,
+    caratWeight: t.caratWeight,
+    color: t.color,
+    clarity: t.clarity,
+    cut: t.cut,
+    shape: t.shape,
+    measurements: t.measurements,
+    certification: t.certification,
+    certificationNumber: t.certificationNumber,
+    primaryImage: t.display?.primaryImage ?? null,
+  };
+}
+export function gemstoneCard(t) {
+  return {
+    serialNumber: t.serialNumber,
+    title: t.display?.title ?? null,
+    stoneType: t.stoneType,
+    price: t.price,
+    currency: t.currency,
+    caratWeight: t.caratWeight,
+    color: t.color,
+    shape: t.shape,
+    dimensions: t.dimensions,
+    certification: t.certification,
+    primaryImage: t.display?.primaryImage ?? null,
+  };
+}
+
 async function diamondSearch(path, opts) {
-  const body = buildDiamondRequest(opts);
+  // Default to a small page — Stuller returns a large default of full stone
+  // objects that overflow token limits; callers page with nextPage.
+  const body = buildDiamondRequest({ ...opts, pageSize: opts.pageSize || 10 });
   const payload = await stullerRequest('POST', path, { body });
   // Natural diamonds nest under Diamonds; lab-grown under LabGrownDiamonds.
   const { items, nextPage, total } = unwrap(payload, ['Diamonds', 'diamonds', 'LabGrownDiamonds', 'labGrownDiamonds']);
+  const stones = items.map(transformDiamond);
   return {
-    count: items.length,
+    count: stones.length,
     totalAvailable: total,
     nextPage,
     hasMore: Boolean(nextPage),
-    diamonds: items.map(transformDiamond),
+    diamonds: opts.full ? stones : stones.map(diamondCard),
   };
 }
 
@@ -197,18 +235,19 @@ export async function searchGemstones(opts = {}) {
   if (opts.width != null) body.Width = Number(opts.width);
   if (opts.serialNumbers?.length) body.SerialNumbers = opts.serialNumbers.map(Number);
   if (opts.filters?.length) body.Filters = opts.filters;
-  if (opts.pageSize) body.PageSize = opts.pageSize;
+  body.PageSize = opts.pageSize || 10; // small default — full stone objects are heavy
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 
   const payload = await stullerRequest('POST', GEMSTONES_PATH, { body });
   const { items, nextPage, total } = unwrap(payload, ['Gemstones', 'gemstones', 'GemStones']);
+  const stones = items.map(transformGemstone);
   return {
-    count: items.length,
+    count: stones.length,
     totalAvailable: total,
     nextPage,
     hasMore: Boolean(nextPage),
-    gemstones: items.map(transformGemstone),
+    gemstones: opts.full ? stones : stones.map(gemstoneCard),
   };
 }
 
@@ -300,11 +339,12 @@ export async function findStonesByDimensions(opts = {}) {
         stoneTypes: stoneType ? [stoneType] : undefined,
         pageSize,
         nextPage,
+        full: true, // need full dimensions to measure fit
       });
       for (const s of res.gemstones) candidates.push(s);
     } else {
       const path = source === 'lab_grown_diamond' ? LAB_GROWN_PATH : DIAMONDS_PATH;
-      res = await diamondSearch(path, { shape: shape ? [shape] : undefined, color, clarity, pageSize, nextPage });
+      res = await diamondSearch(path, { shape: shape ? [shape] : undefined, color, clarity, pageSize, nextPage, full: true });
       for (const s of res.diamonds) candidates.push(s);
     }
     scanned += res[source === 'gemstone' ? 'gemstones' : 'diamonds'].length;
@@ -324,7 +364,8 @@ export async function findStonesByDimensions(opts = {}) {
     .sort((a, b) => a.deviationMm - b.deviationMm)
     .slice(0, maxResults)
     .map((c) => ({
-      ...c.stone,
+      // Lean card (consistent with the search tools) + the fit measurement.
+      ...(source === 'gemstone' ? gemstoneCard(c.stone) : diamondCard(c.stone)),
       fit: {
         lengthMm: c.lengthMm,
         widthMm: c.widthMm,

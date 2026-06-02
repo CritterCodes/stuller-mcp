@@ -6,7 +6,32 @@ import {
   transformDiamond,
   transformGemstone,
   buildDiamondRequest,
+  diamondCard,
+  gemstoneCard,
 } from '../src/tools/gems.js';
+
+test('diamondCard / gemstoneCard are lean projections', () => {
+  const dFull = transformDiamond({
+    SerialNumber: 1,
+    CaratWeight: 1,
+    Color: 'G',
+    Clarity: 'VS1',
+    Shape: 'Round',
+    Price: { Value: 5100, CurrencyCode: 'USD' },
+    Certification: 'GIA',
+    CertificationNumber: '123',
+    Images: [{ FullUrl: 'a' }, { FullUrl: 'b' }],
+  });
+  const dCard = diamondCard(dFull);
+  assert.equal(dCard.certificationNumber, '123');
+  assert.equal(dCard.primaryImage, 'a');
+  assert.ok(!('images' in dCard), 'card drops the full images array');
+  assert.ok(JSON.stringify(dCard).length < JSON.stringify(dFull).length);
+
+  const gCard = gemstoneCard(transformGemstone({ StoneType: 'Sapphire', CaratWeight: 2, Color: 'Bl', Price: 100 }));
+  assert.equal(gCard.stoneType, 'Sapphire');
+  assert.ok(!('videos' in gCard));
+});
 import { sizedImageUrl } from '../src/stuller/util.js';
 
 // ---- sizedImageUrl (Stuller CDN size tokens) ----

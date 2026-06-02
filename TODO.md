@@ -58,7 +58,9 @@ From a full live QA sweep:
 - [x] **Lab-grown bug** — response nests under `LabGrownDiamonds`/`TotalNumberOfLabGrownDiamonds`, not `Diamonds`; unwrap was returning 0 always. Fixed (8049 total now).
 - [x] **order_status 500** — Stuller's /v2/orders 500s (account-gated). Now degrades gracefully with a note pointing to list_invoices.
 - [x] **Docs** — gemstone `colors` filter is unreliable (rejects record codes, ignores words) + endpoint returns empty first pages → documented; configure_product returns no configurationId → get_configured_product description clarified.
-- [ ] **discover_categories "stud" = 0** — account-data dependent (this login's earrings aren't tagged with stud categories in the scanned slice); works for rings. Revisit on a fuller catalog / deeper scan.
+- [x] **discover_categories "stud" = 0** — confirmed account-data (this login's 300 earrings tag only "Earrings"; rings tag richly). Tool no longer dead-ends: when `contains` matches nothing it returns a note + `otherCategories` (what was found). Docs softened.
+- [x] **list_invoices ignored the date window** — Stuller's invoice endpoint ignores ALL date params (returns full 2023→2026 history). Now filtered CLIENT-SIDE by invoiceDate; verified (May 2026 → 5 invoices, was 119).
+- [x] **Stone searches overflowed** — search_diamonds/lab_grown/gemstones now return LEAN cards + default pageSize 10 (150K–327K → ~3.7K); `full:true` opt; find_stones_by_dimensions scans full internally + returns lean cards + fit.
 
 ## Parked ideas
 

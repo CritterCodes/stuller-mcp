@@ -70,7 +70,15 @@ export async function listInvoices(opts = {}) {
   const payload = await stullerRequest('POST', INVOICE_PATH, { body: { DateFrom: dateFrom, DateTo: dateTo } });
   let invoices = (payload?.Invoices || payload?.invoices || []).map(transformInvoice);
 
-  // Client-side narrowing (the API ignores these filters).
+  // Stuller's invoice endpoint IGNORES the date params (returns the full history
+  // regardless), so the date window must be applied client-side. invoiceDate is an
+  // ISO string ("2026-05-28T00:00:00"); compare on the YYYY-MM-DD prefix.
+  invoices = invoices.filter((i) => {
+    const day = String(i.invoiceDate || '').slice(0, 10);
+    return day && day >= dateFrom && day <= dateTo;
+  });
+
+  // Client-side narrowing (the API ignores these filters too).
   const eq = (a, b) => String(a ?? '').trim() === String(b ?? '').trim();
   if (opts.orderNumber != null) invoices = invoices.filter((i) => eq(i.orderNumber, opts.orderNumber));
   if (opts.invoiceNumber != null) invoices = invoices.filter((i) => eq(i.invoiceNumber, opts.invoiceNumber));
