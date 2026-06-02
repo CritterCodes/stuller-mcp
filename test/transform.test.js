@@ -163,6 +163,37 @@ test('transformInvoice surfaces tracking, totals, and backorder counts', async (
   assert.equal(i.backorderedItems, 1, 'one line is back-ordered');
 });
 
+test('quote builder computes totals and handles manual lines (no network)', async () => {
+  const { quoteAdd, quoteRemove, quoteView, quoteToOrder, summarizeCart, _resetCartsForTest } = await import(
+    '../src/tools/quote.js'
+  );
+  _resetCartsForTest();
+
+  // summarizeCart is pure.
+  const s = summarizeCart([
+    { source: 'stuller', sku: 'A', quantity: 3, unitPrice: 10, currency: 'USD', orderable: true },
+    { source: 'manual', sku: null, description: 'Labor', quantity: 1, unitPrice: 75, currency: 'USD' },
+  ]);
+  assert.equal(s.subtotal, 105);
+  assert.equal(s.totalQuantity, 4);
+  assert.equal(s.flags.hasManualLines, true);
+
+  // Manual add/remove needs no network.
+  const cartId = 'test-cart';
+  await quoteAdd({ cartId, description: 'Bench labor', unitPrice: 75, quantity: 2 });
+  let v = await quoteView({ cartId });
+  assert.equal(v.subtotal, 150);
+  assert.equal(v.itemCount, 1);
+
+  // Manual lines are excluded from an order.
+  const o = quoteToOrder({ cartId });
+  assert.equal(o.lines.length, 0);
+  assert.equal(o.excluded.length, 1);
+
+  v = quoteRemove({ cartId, index: 1 });
+  assert.equal(v.itemCount, 0);
+});
+
 test('the server advertises instructions at connect', async () => {
   const { buildServer } = await import('../src/server.js');
   const server = buildServer();

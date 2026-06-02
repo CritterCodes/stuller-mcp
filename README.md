@@ -120,6 +120,11 @@ Point `command`/`args` at your checkout — useful for development:
 | `order_status` | read | Read order history / status (by order number or date range). |
 | `list_invoices` | read | Fulfillment view: invoices for a date range with shipment **tracking**, totals, and back-ordered line items. |
 | `get_shipment` | read | Full shipment detail by shipment header id (tracking, carrier, package contents). |
+| `quote_add_item` | read | Add a SKU (live-priced) or a manual line (labor/custom) to a session quote; returns a running subtotal. |
+| `quote_view` | read | Show the quote with line/subtotal and flags; `refresh` re-prices live. |
+| `quote_remove_item` | read | Remove a line by SKU or index. |
+| `quote_clear` | read | Empty the quote. |
+| `quote_to_order` | read | Convert the quote into a `submit_order`-ready `lines` array. |
 | `submit_order` | **write** | Place an order. Dry-run by default; only transmits with `confirm: true`. |
 
 ### How searching works

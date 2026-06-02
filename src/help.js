@@ -47,8 +47,16 @@ There is **no free-text keyword search**. Two ways to find products:
 
 Filter values are plain codes/words: color "G", clarity "VS1", shape "Round".
 
+## Building a quote
+- \`quote_add_item\` — add a SKU (priced live) or a manual line (\`description\` + \`unitPrice\`, e.g. labor) to a session quote
+- \`quote_view\` (\`refresh\` to re-price), \`quote_remove_item\`, \`quote_clear\`
+- \`quote_to_order\` — turn the quote into a \`submit_order\`-ready \`lines\` array
+
+The quote lives in memory for this session only (Stuller has no server-side cart).
+
 ## Ordering (write)
 - \`order_status\` — read order history/status (read-only)
+- \`list_invoices\` — invoices with shipment **tracking** + back-ordered items (the "did it ship?" view)
 - \`submit_order\` — **dry run by default**: it returns the order body it *would* send and transmits nothing. Review it, then call again with \`confirm: true\` to actually place the order. Set \`STULLER_DISABLE_ORDERING=true\` in the environment to hard-disable it.
 
 ## A typical flow

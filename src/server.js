@@ -18,6 +18,7 @@ import {
 } from './tools/gems.js';
 import { searchVirtualProducts, configureProduct, getConfiguredProduct } from './tools/configurable.js';
 import { listInvoices, getShipment } from './tools/invoices.js';
+import { quoteAdd, quoteRemove, quoteView, quoteClear, quoteToOrder } from './tools/quote.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
 import { SERVER_INSTRUCTIONS, USAGE_GUIDE } from './help.js';
 
@@ -293,6 +294,50 @@ export function buildServer() {
       include: z.array(z.string()).optional(),
     },
     tool((a) => getConfiguredProduct(a))
+  );
+
+  // ---- Quote builder (session-scoped, in-memory) ----
+  const cartIdArg = z.string().optional().describe('Name of the quote to act on (default "default"); use to keep several quotes');
+
+  server.tool(
+    'quote_add_item',
+    'Add a line to a quote/cart. Give `sku` (+ optional `quantity`) to pull live Stuller price & availability, or `description` + `unitPrice` for a manual line (labor, custom charges). Adding an existing SKU merges quantities. Returns the updated quote with a running subtotal. The quote is session-scoped (in memory) — Stuller has no server-side cart.',
+    {
+      sku: z.string().optional().describe('Stuller SKU to price live'),
+      quantity: z.number().int().positive().optional().describe('Default 1'),
+      description: z.string().optional().describe('For a manual (non-SKU) line'),
+      unitPrice: z.number().optional().describe('Required for a manual line'),
+      cartId: cartIdArg,
+    },
+    tool((a) => quoteAdd(a))
+  );
+
+  server.tool(
+    'quote_view',
+    'Show a quote: every line, quantities, unit/line prices, and the running subtotal, plus flags (unpriced / manual / out-of-stock lines). Pass `refresh: true` to re-pull live prices for all Stuller lines.',
+    { cartId: cartIdArg, refresh: z.boolean().optional().describe('Re-price all Stuller lines live') },
+    tool((a) => quoteView(a))
+  );
+
+  server.tool(
+    'quote_remove_item',
+    'Remove a line from a quote by `sku` or by 1-based `index`. Returns the updated quote.',
+    { sku: z.string().optional(), index: z.number().int().positive().optional(), cartId: cartIdArg },
+    tool((a) => quoteRemove(a))
+  );
+
+  server.tool(
+    'quote_clear',
+    'Empty a quote.',
+    { cartId: cartIdArg },
+    tool((a) => quoteClear(a))
+  );
+
+  server.tool(
+    'quote_to_order',
+    'Convert a quote into a submit_order-ready `lines` array (Stuller SKU lines only). Manual lines are returned under `excluded` since they can\'t be ordered via the API. Hand `lines` to submit_order (which still defaults to a dry run).',
+    { cartId: cartIdArg },
+    tool((a) => quoteToOrder(a))
   );
 
   // ---- Orders ----

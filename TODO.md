@@ -38,7 +38,9 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 3. [x] **Stone matching by dimensions** — ✅ shipped as `find_stones_by_dimensions`. NOTE: Stuller's native `bestfitstonesbydimensions` 500s on every input (account-gated/broken) and `searchstones`/`searchstonesbystonegroup` need a ConfigurationModelId, so this is a client-side matcher: scan a stone family by shape, rank by mm deviation. Handles round stones reporting Width=0 (falls back to length). Verified live (diamond 4.1mm, sapphire 5.0/6.9mm).
 4. [x] **Configurable & virtual products** — ✅ shipped. `search_virtual_products` (semi-mounts + their config model, setting locations, canBeSetWith, baseProductId), `configure_product` (price a configured mounting → total + ship date + imagery), `get_configured_product`. NOTE: configure_product needs the BaseProduct.Id, not ConfigurationModel.Id (passing the latter 500s); virtual needs a selector + Include=["All"] to populate the config model. Verified live.
 5. [x] **Order fulfillment loop** — ✅ shipped. `list_invoices` (date-range invoices with shipment tracking number/link/method, totals, ship-to, and back-ordered line items; defaults to last 90 days) + `get_shipment` (by shipment header id). NOTE: Stuller filters invoices only by date — order/invoice/PO narrowing is client-side; invoices don't expose a ShipmentHeaderId. Verified live (119 invoices, real FedEx tracking).
-6. **Cart / quote builder** — a stateful tool that accumulates line items with live pricing and a running total; turns one-off lookups into a real quoting workflow.
+6. [x] **Cart / quote builder** — ✅ shipped. Session-scoped in-memory quote (`quote_add_item`, `quote_view`, `quote_remove_item`, `quote_clear`, `quote_to_order`): SKU lines priced live (merge on repeat) + manual labor/custom lines, running subtotal, `refresh` re-prices, converts to a submit_order `lines` array (manual lines excluded). Stuller has no server-side cart. Pure totals unit-tested; verified live.
+
+**🎉 Feature roadmap complete — all 6 shipped.**
 
 ---
 
@@ -61,6 +63,7 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 - Stone fit-by-dimensions matcher (`find_stones_by_dimensions`) over diamonds/lab-grown/gemstones.
 - Configurable/semi-mount products (`search_virtual_products`, `configure_product`, `get_configured_product`).
 - Order fulfillment: invoices + shipment tracking (`list_invoices`, `get_shipment`).
+- Session quote builder (`quote_add_item`, `quote_view`, `quote_remove_item`, `quote_clear`, `quote_to_order`).
 - In-chat docs: server `instructions` (sent at connect) + `get_started` tool (markdown walkthrough), sourced from `src/help.js`.
 - Env-based HTTP Basic auth, `.env.example`, `.gitignore`, smoke script (graceful without creds).
 - All read paths verified against the live Stuller catalog.
