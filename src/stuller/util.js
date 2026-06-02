@@ -45,3 +45,23 @@ export function extractCategories(raw = []) {
 export function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * Render-ready summary for any buyable result, so a UI/voice/TV surface can
+ * display "what you're buying" with zero parsing.
+ * @param {{ title?:string, price?:number, currency?:string,
+ *   images?:{full?,thumbnail?,zoom?}[], video?:string }} o
+ * @returns {{ title, price, currency, primaryImage, thumbnail, video }}
+ */
+export function buildDisplay({ title, price, currency = 'USD', images = [], video = null } = {}) {
+  const first = (Array.isArray(images) && images[0]) || {};
+  const primaryImage = first.full || first.zoom || first.thumbnail || null;
+  return {
+    title: title || null,
+    price: price ?? null,
+    currency,
+    primaryImage,
+    thumbnail: first.thumbnail || primaryImage,
+    video: video || null,
+  };
+}

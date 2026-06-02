@@ -3,7 +3,7 @@
 // and handles the many casings/aliases Stuller returns across endpoints; it is
 // extended here to surface images/media and to handle the list+paging envelope.
 
-import { extractImages, extractCategories } from './util.js';
+import { extractImages, extractCategories, buildDisplay } from './util.js';
 
 // ---- response envelope ----
 // POST /v2/products returns { Products: [...], NextPage: "token"|null }.
@@ -71,13 +71,19 @@ function normalizeMedia(productData = {}) {
 
 export function transformProduct(productData = {}, itemNumber = '') {
   const descriptiveElements = productData.DescriptiveElementGroup?.DescriptiveElements || [];
+  const images = extractImages(productData.Images || productData.images || []);
+  const media = normalizeMedia(productData);
+  const description =
+    productData.description || productData.Description || productData.shortDescription || productData.ShortDescription || '';
+  const price =
+    productData.Price?.Value || productData.pricing?.retail || productData.price || productData.RetailPrice || productData.ListPrice || 0;
+  const currency = productData.Price?.CurrencyCode || 'USD';
 
   return {
     itemNumber:
       productData.itemNumber || productData.ItemNumber || productData.sku || productData.SKU || itemNumber,
     productId: productData.Id ?? null,
-    description:
-      productData.description || productData.Description || productData.shortDescription || productData.ShortDescription || '',
+    description,
     longDescription:
       productData.longDescription || productData.LongDescription || productData.DetailedDescription || productData.GroupDescription || '',
     category: {
@@ -94,9 +100,9 @@ export function transformProduct(productData = {}, itemNumber = '') {
         .filter(Boolean)
         .join(' -> '),
     },
-    price: productData.Price?.Value || productData.pricing?.retail || productData.price || productData.RetailPrice || productData.ListPrice || 0,
+    price,
     showcasePrice: productData.ShowcasePrice?.Value || null,
-    currency: productData.Price?.CurrencyCode || 'USD',
+    currency,
     weight: productData.weight || productData.Weight || productData.GramWeight || null,
     weightUnit: productData.WeightUnitOfMeasure || 'grams',
     gramWeight: productData.GramWeight || null,
@@ -108,8 +114,10 @@ export function transformProduct(productData = {}, itemNumber = '') {
       series: getDescriptiveElement(descriptiveElements, 'Series')?.displayValue || '',
     },
     dimensions: buildDimensions(descriptiveElements),
-    images: extractImages(productData.Images || productData.images || []),
-    media: normalizeMedia(productData),
+    images,
+    media,
+    // Render-ready summary for UIs / voice / TV surfaces.
+    display: buildDisplay({ title: description, price, currency, images, video: media[0]?.url }),
     // WebCategories carry { id, name, path }; the ids are valid CategoryIds you
     // can drill into via search_products / discover_categories.
     webCategories: extractCategories(productData.WebCategories || productData.webCategories || []),

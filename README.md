@@ -105,6 +105,7 @@ Point `command`/`args` at your checkout — useful for development:
 | `get_started` | read | Returns a markdown usage guide (finding products, pricing, stone search, ordering). Ask the assistant how to use the server. |
 | `get_products` | read | Fetch one or more products by SKU. Returns normalized product data + a `notFound` list. |
 | `product_detail` | read | Full detail for a single SKU including images, media, and all specifications. |
+| `show_product` | read | Fetch a product image and return it **inline** (renders in image-capable clients; a "show this" payload for a voice/TV surface). |
 | `pricing_availability` | read | Lean real-time price + stock/availability for a batch of SKUs. |
 | `find_products` | read | **Natural-language search** — give a plain phrase ("white gold diamond stud earrings") and it resolves the terms to real facets, then searches. Easiest entry point. |
 | `advanced_product_filters` | read | Discover the facets you can search on (ProductType, MetalQuality, StoneFamily, …) and their valid values. |
@@ -163,6 +164,16 @@ Feed that `baseProductId` into `configure_product` with your choices (`ringSize`
 Read tools accept an optional `include` array of Stuller **ProductInclude** values (e.g. `["All"]`, `["Prices"]`, `["Media"]`) to control how much data comes back. `product_detail` defaults to `["All"]`. See the [Stuller API help](https://api.stuller.com/Help) for the full enum.
 
 ---
+
+## Seeing what you're buying (images)
+
+Every buyable result carries a render-ready **`display`** block so any surface (web UI, kiosk, a voice assistant on a TV) can show the item with zero parsing:
+
+```jsonc
+display: { title, price, currency, primaryImage, thumbnail, video }
+```
+
+`primaryImage`/`thumbnail` are CDN URLs (configurable mounts prefer the *fully-set* finished look). For lightweight/bulk rendering, surfaces should use these URLs directly. To render a single image **inline in chat** (or push it to a screen), call **`show_product`** — it downloads the image and returns an MCP image content block. URLs stay the default; inlining (base64) is opt-in and single-item.
 
 ## Worked example: source a stone + price a mounting
 

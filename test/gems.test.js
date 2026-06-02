@@ -118,6 +118,20 @@ test('transformDiamond: empty input does not throw', () => {
 
 // ---- transformGemstone ----
 
+test('transformDiamond: display composes a title from the 4Cs', () => {
+  const d = transformDiamond({
+    CaratWeight: 1.0,
+    Color: 'G',
+    Clarity: 'VS1',
+    Shape: 'Round',
+    Price: { Value: 5100, CurrencyCode: 'USD' },
+    Images: [{ FullUrl: 'http://img/d.jpg' }],
+  });
+  assert.equal(d.display.title, '1ct G VS1 Round Diamond');
+  assert.equal(d.display.price, 5100);
+  assert.equal(d.display.primaryImage, 'http://img/d.jpg');
+});
+
 test('transformGemstone: maps type, color, dims, money', () => {
   const g = transformGemstone({
     SerialNumber: 9,

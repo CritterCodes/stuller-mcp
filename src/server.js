@@ -18,6 +18,7 @@ import {
   findStonesByDimensions,
 } from './tools/gems.js';
 import { searchVirtualProducts, configureProduct, getConfiguredProduct } from './tools/configurable.js';
+import { showProduct } from './tools/media.js';
 import { listInvoices, getShipment } from './tools/invoices.js';
 import { quoteAdd, quoteRemove, quoteView, quoteClear, quoteToOrder } from './tools/quote.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
@@ -160,6 +161,31 @@ export function buildServer() {
       pageSize: z.number().int().positive().optional().describe('Products per page (default 50)'),
     },
     tool((a) => discoverCategories(a))
+  );
+
+  server.tool(
+    'show_product',
+    'Fetch a product image and return it as an inline image (renders in image-capable MCP clients, and gives a voice/TV surface a "show this" payload). Pass a `sku` (its primary image is used) or an explicit `imageUrl`. For bulk results prefer the `display.primaryImage` URLs already in tool output — this tool inlines a single image on demand.',
+    {
+      sku: z.string().optional().describe('Stuller SKU; uses its primary image'),
+      imageUrl: z.string().optional().describe('Explicit image URL (e.g. a display.primaryImage or fullySetImages URL)'),
+    },
+    async (a) => {
+      try {
+        const r = await showProduct(a || {});
+        const caption = [r.title, r.price != null ? `$${r.price} ${r.currency}` : null, r.sourceUrl]
+          .filter(Boolean)
+          .join(' — ');
+        return {
+          content: [
+            { type: 'image', data: r.base64, mimeType: r.mimeType },
+            { type: 'text', text: caption },
+          ],
+        };
+      } catch (err) {
+        return fail(err);
+      }
+    }
   );
 
   server.tool(

@@ -112,6 +112,29 @@ test('transformProduct: descriptive elements feed metal + specifications', () =>
 
 // ---- summarizePricing ----
 
+test('transformProduct: display block is render-ready', () => {
+  const p = transformProduct({
+    SKU: 'X',
+    Description: 'Gold Ring',
+    Price: { Value: 100, CurrencyCode: 'USD' },
+    Images: [{ FullUrl: 'http://img/full.jpg', ThumbnailUrl: 'http://img/thumb.jpg' }],
+  });
+  assert.deepEqual(p.display, {
+    title: 'Gold Ring',
+    price: 100,
+    currency: 'USD',
+    primaryImage: 'http://img/full.jpg',
+    thumbnail: 'http://img/thumb.jpg',
+    video: null,
+  });
+});
+
+test('transformProduct: display has null image when none present', () => {
+  const p = transformProduct({ SKU: 'X', Description: 'No pics' });
+  assert.equal(p.display.primaryImage, null);
+  assert.equal(p.display.title, 'No pics');
+});
+
 test('summarizePricing: projects exactly the money + stock fields', () => {
   const s = summarizePricing(
     transformProduct({ SKU: 'A', Price: { Value: 9.99, CurrencyCode: 'USD' }, OnHand: 1, Orderable: false })

@@ -1,5 +1,5 @@
 import { stullerRequest } from '../stuller/client.js';
-import { money, currencyOf, extractImages as images } from '../stuller/util.js';
+import { money, currencyOf, extractImages as images, buildDisplay } from '../stuller/util.js';
 
 const VIRTUAL_PATH = '/v2/products/virtual';
 const CONFIGURE_PATH = '/v2/products/configureproduct';
@@ -12,6 +12,8 @@ const DEFAULT_INCLUDE = ['All'];
 function transformVirtual(p = {}) {
   const cm = p.ConfigurationModel || {};
   const base = p.BaseProduct || {};
+  const productImages = images(p.Images);
+  const fullySetImages = images(p.FullySetImages);
   return {
     sku: p.SKU ?? null,
     shortDescription: p.ShortDescription ?? null,
@@ -47,8 +49,15 @@ function transformVirtual(p = {}) {
       settingType: c.SettingType,
     })),
     setWith: p.SetWith || [],
-    images: images(p.Images),
-    fullySetImages: images(p.FullySetImages),
+    images: productImages,
+    fullySetImages,
+    // Prefer the finished (set) look for display when available.
+    display: buildDisplay({
+      title: p.ShortDescription ?? base.Description ?? null,
+      price: money(p.Price),
+      currency: currencyOf(p.Price),
+      images: fullySetImages.length ? fullySetImages : productImages,
+    }),
   };
 }
 

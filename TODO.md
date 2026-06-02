@@ -44,6 +44,12 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 ---
 
+## Visual / display layer
+
+- [x] **`display` block** on every buyable result ({ title, price, currency, primaryImage, thumbnail, video }) — render-ready for any UI/voice/TV surface. Configurable mounts prefer the fully-set image; diamonds/gemstones get a composed title.
+- [x] **`show_product` tool** — fetches a product image and returns an MCP image content block (inline render / "show this" payload). URLs stay default; base64 is opt-in, single-item, size-guarded.
+- [ ] Future: sized image variants (Stuller CDN size tokens) once confirmed; push-to-screen integration for the parked voice assistant.
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.

@@ -29,6 +29,17 @@ test('transformVirtual: baseProductId comes from BaseProduct.Id, not Configurati
   assert.equal(v.canBeSetWith[0].size, '7.00');
 });
 
+test('transformVirtual: display prefers the fully-set (finished) image', () => {
+  const v = transformVirtual({
+    ShortDescription: 'Marquise Solitaire Mounting',
+    Price: { Value: 985.8, CurrencyCode: 'USD' },
+    Images: [{ FullUrl: 'http://img/empty-mount.jpg' }],
+    FullySetImages: [{ FullUrl: 'http://img/with-stone.jpg' }],
+  });
+  assert.equal(v.display.title, 'Marquise Solitaire Mounting');
+  assert.equal(v.display.primaryImage, 'http://img/with-stone.jpg', 'finished look wins');
+});
+
 test('transformVirtual: missing config model / base product → safe defaults', () => {
   const v = transformVirtual({ SKU: 'X' });
   assert.equal(v.baseProductId, null);

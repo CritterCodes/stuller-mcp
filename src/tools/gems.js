@@ -1,5 +1,10 @@
 import { stullerRequest } from '../stuller/client.js';
-import { money, currencyOf, extractImages } from '../stuller/util.js';
+import { money, currencyOf, extractImages, buildDisplay } from '../stuller/util.js';
+
+// Compose a human title from stone attributes (diamonds have no description field).
+function stoneTitle(parts) {
+  return parts.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim() || null;
+}
 
 const DIAMONDS_PATH = '/v2/gem/diamonds';
 const LAB_GROWN_PATH = '/v2/gem/labgrowndiamonds';
@@ -36,6 +41,14 @@ export function buildDiamondRequest(opts = {}) {
 }
 
 export function transformDiamond(d = {}) {
+  const images = extractImages(d.Images);
+  const title = stoneTitle([
+    d.CaratWeight != null ? `${d.CaratWeight}ct` : null,
+    d.Color,
+    d.Clarity,
+    d.Shape,
+    'Diamond',
+  ]);
   return {
     serialNumber: d.SerialNumber ?? null,
     shape: d.Shape ?? null,
@@ -64,12 +77,26 @@ export function transformDiamond(d = {}) {
     certificationNumber: d.CertificationNumber ?? null,
     certificatePath: d.CertificatePath ?? null,
     countryOfOrigin: d.CountryOfOrigin ?? null,
-    images: extractImages(d.Images),
+    images,
     videos: d.Videos ?? [],
+    display: buildDisplay({
+      title,
+      price: money(d.Price),
+      currency: currencyOf(d.Price, d.PricePerCarat, d.ShowcasePrice),
+      images,
+      video: (d.Videos || [])[0]?.Url || (d.Videos || [])[0] || null,
+    }),
   };
 }
 
 export function transformGemstone(g = {}) {
+  const images = extractImages(g.Images);
+  const title = g.Description || stoneTitle([
+    g.CaratWeight != null ? `${g.CaratWeight}ct` : null,
+    g.Color,
+    g.Shape,
+    g.StoneType ?? g.GemType,
+  ]);
   return {
     serialNumber: g.SerialNumber ?? null,
     stoneType: g.StoneType ?? g.GemType ?? null,
@@ -93,8 +120,15 @@ export function transformGemstone(g = {}) {
     certification: g.Certification ?? null,
     certificationNumber: g.CertificationNumber ?? null,
     description: g.Description ?? null,
-    images: extractImages(g.Images),
+    images,
     videos: g.Videos ?? [],
+    display: buildDisplay({
+      title,
+      price: money(g.Price),
+      currency: currencyOf(g.Price, g.PricePerCarat, g.ShowcasePrice),
+      images,
+      video: (g.Videos || [])[0]?.Url || (g.Videos || [])[0] || null,
+    }),
   };
 }
 
