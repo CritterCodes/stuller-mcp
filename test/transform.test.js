@@ -139,6 +139,30 @@ test('transformVirtual surfaces baseProductId and the configuration model', asyn
   assert.equal(v.canBeSetWith[0].size, '7.00');
 });
 
+test('transformInvoice surfaces tracking, totals, and backorder counts', async () => {
+  const { transformInvoice } = await import('../src/tools/invoices.js');
+  const i = transformInvoice({
+    InvoiceNumber: 48172755,
+    OrderNumber: 36668334,
+    Status: 'Closed',
+    TrackingNumber: '649514744407',
+    TrackingLink: 'https://www.fedex.com/fedextrack/?trknbr=649514744407',
+    ShipMethod: 'FED_STD_OVERNIGHT',
+    OrderTotal: 261.61,
+    InvoiceTotal: { Value: 291.5, CurrencyCode: 'USD' }, // money helper handles both shapes
+    InvoiceDetails: [
+      { LineNumber: 1, ItemNumber: 'A', ShipQuantity: 1, BackOrderedQuantity: 0, UnitPrice: 10, LineTotal: 10 },
+      { LineNumber: 2, ItemNumber: 'B', ShipQuantity: 0, BackOrderedQuantity: 2, UnitPrice: 5, LineTotal: 0 },
+    ],
+  });
+  assert.equal(i.tracking.number, '649514744407');
+  assert.equal(i.tracking.link.includes('fedextrack'), true);
+  assert.equal(i.totals.order, 261.61);
+  assert.equal(i.totals.invoice, 291.5, 'money helper unwraps {Value}');
+  assert.equal(i.lineItems.length, 2);
+  assert.equal(i.backorderedItems, 1, 'one line is back-ordered');
+});
+
 test('the server advertises instructions at connect', async () => {
   const { buildServer } = await import('../src/server.js');
   const server = buildServer();

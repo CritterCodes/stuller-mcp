@@ -118,6 +118,8 @@ Point `command`/`args` at your checkout — useful for development:
 | `configure_product` | read | Price a configured mounting (ring size, stones, engraving) — live total + ship date + imagery. Quote only; does not order. |
 | `get_configured_product` | read | Retrieve a previously configured item by its configuration id. |
 | `order_status` | read | Read order history / status (by order number or date range). |
+| `list_invoices` | read | Fulfillment view: invoices for a date range with shipment **tracking**, totals, and back-ordered line items. |
+| `get_shipment` | read | Full shipment detail by shipment header id (tracking, carrier, package contents). |
 | `submit_order` | **write** | Place an order. Dry-run by default; only transmits with `confirm: true`. |
 
 ### How searching works
@@ -158,7 +160,7 @@ Read tools accept an optional `include` array of Stuller **ProductInclude** valu
 
 ## Safety model
 
-- **Reads** (`get_products`, `product_detail`, `pricing_availability`, `search_products`, `metal_market_rates`, `order_status`) never modify anything.
+- **Reads** (everything except `submit_order` — products, stones, configuration, `order_status`, `list_invoices`, `get_shipment`, …) never modify anything.
 - **`submit_order` is the only write tool.** It defaults to a **dry run** — it returns the exact request body it *would* send and transmits nothing until you call it again with `confirm: true`.
 - Set `STULLER_DISABLE_ORDERING=true` to hard-disable order submission entirely, regardless of the `confirm` flag.
 

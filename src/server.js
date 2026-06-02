@@ -17,6 +17,7 @@ import {
   findStonesByDimensions,
 } from './tools/gems.js';
 import { searchVirtualProducts, configureProduct, getConfiguredProduct } from './tools/configurable.js';
+import { listInvoices, getShipment } from './tools/invoices.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
 import { SERVER_INSTRUCTIONS, USAGE_GUIDE } from './help.js';
 
@@ -304,6 +305,29 @@ export function buildServer() {
       until: z.string().optional().describe('ISO date'),
     },
     tool((a) => orderStatus(a))
+  );
+
+  server.tool(
+    'list_invoices',
+    'List invoices for a date range — the fulfillment & tracking view. Each invoice includes shipment tracking (number + carrier link + method), order/invoice numbers, totals, ship-to address, and line items with back-ordered quantities. Use this to answer "did my order ship / what\'s the tracking / what\'s backordered". Defaults to the last 90 days. `onlyShipped`/`onlyOpen` narrow the set. NOTE: Stuller filters invoices only by date; orderNumber/invoiceNumber/purchaseOrderNumber narrowing is applied locally, so keep the date window around the order you want.',
+    {
+      dateFrom: z.string().optional().describe('ISO date (default: 90 days ago)'),
+      dateTo: z.string().optional().describe('ISO date (default: today)'),
+      orderNumber: z.union([z.string(), z.number()]).optional(),
+      invoiceNumber: z.union([z.string(), z.number()]).optional(),
+      purchaseOrderNumber: z.string().optional(),
+      onlyShipped: z.boolean().optional().describe('Only invoices that have a tracking number'),
+      onlyOpen: z.boolean().optional().describe('Exclude closed invoices'),
+      limit: z.number().int().positive().optional(),
+    },
+    tool((a) => listInvoices(a))
+  );
+
+  server.tool(
+    'get_shipment',
+    'Get a single shipment\'s full detail by its shipment header id: tracking number, carrier, destination, and package line items. (Shipment ids are not exposed on invoices; use this when you already have one.)',
+    { shipmentHeaderId: z.number().int().describe('The shipment header id') },
+    tool((a) => getShipment(a))
   );
 
   server.tool(
