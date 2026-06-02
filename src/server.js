@@ -9,6 +9,7 @@ import {
   metalMarketRates,
   advancedProductFilters,
 } from './tools/products.js';
+import { searchDiamonds, searchLabGrownDiamonds, searchGemstones } from './tools/gems.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
 
 // Wrap a data function so its JSON result becomes MCP tool content and errors
@@ -109,6 +110,62 @@ export function buildServer() {
     'Current Stuller metal market rates (gold, platinum, silver, etc.). No arguments. Useful for pricing metal-dependent jewelry work.',
     {},
     tool(() => metalMarketRates())
+  );
+
+  // ---- Gems (diamonds & colored stones) ----
+  const diamondArgs = {
+    caratMin: z.number().positive().optional().describe('Minimum carat weight'),
+    caratMax: z.number().positive().optional().describe('Maximum carat weight'),
+    priceMin: z.number().nonnegative().optional().describe('Minimum total price'),
+    priceMax: z.number().positive().optional().describe('Maximum total price'),
+    color: z.array(z.string()).optional().describe('Color grades, e.g. ["D","E","F"] or ["G"]'),
+    clarity: z.array(z.string()).optional().describe('Clarity grades, e.g. ["VS1","VVS2","IF"]'),
+    cut: z.array(z.string()).optional().describe('Cut grades, e.g. ["Ideal","Excellent"]'),
+    shape: z.array(z.string()).optional().describe('Shapes, e.g. ["Round","Princess","Oval"]'),
+    polish: z.array(z.string()).optional(),
+    symmetry: z.array(z.string()).optional(),
+    fluorescence: z.array(z.string()).optional(),
+    certification: z.array(z.string()).optional().describe('Labs, e.g. ["GIA","IGI"]'),
+    fancyColors: z.array(z.string()).optional().describe('Fancy color names for colored diamonds'),
+    serialNumbers: z.array(z.number().int()).optional().describe('Look up specific stones by serial number'),
+    pageSize: z.number().int().positive().optional(),
+    page: z.number().int().positive().optional(),
+    nextPage: z.string().optional().describe('Paging token from a prior call'),
+  };
+
+  server.tool(
+    'search_diamonds',
+    'Search Stuller\'s natural diamond inventory by the 4Cs and more: carat range (caratMin/caratMax), color, clarity, cut, shape, plus polish/symmetry/fluorescence, certification lab, and price range. Returns each diamond\'s specs, price, certificate number, and images, with a `nextPage` token + `totalAvailable` count. Filter values are plain codes/words (e.g. color "G", clarity "VS1", shape "Round").',
+    diamondArgs,
+    tool((a) => searchDiamonds(a))
+  );
+
+  server.tool(
+    'search_lab_grown_diamonds',
+    'Search Stuller\'s lab-grown diamond inventory. Identical filters to search_diamonds (4Cs, shape, certification, price/carat ranges, paging).',
+    diamondArgs,
+    tool((a) => searchLabGrownDiamonds(a))
+  );
+
+  server.tool(
+    'search_gemstones',
+    'Search Stuller\'s colored gemstone inventory (sapphire, ruby, emerald, etc.). Filter by `stoneTypes` (e.g. ["Sapphire"]), `colors`, `shapes`, and `length`/`width` in mm; `filters` accepts Option/Value pairs (e.g. { Option: "SizeTypeCarat", Value: "..." }). Returns each stone\'s type, color, carat, price, dimensions, certification, and images, with `nextPage` paging + `totalAvailable`.',
+    {
+      stoneTypes: z.array(z.string()).optional().describe('Gem types, e.g. ["Sapphire","Ruby","Emerald"]'),
+      colors: z.array(z.string()).optional(),
+      shapes: z.array(z.string()).optional().describe('e.g. ["Round","Oval","Cushion"]'),
+      length: z.number().positive().optional().describe('Length in mm'),
+      width: z.number().positive().optional().describe('Width in mm'),
+      serialNumbers: z.array(z.number().int()).optional(),
+      filters: z
+        .array(z.object({ Option: z.string(), Value: z.string() }))
+        .optional()
+        .describe('Generic Option/Value filter pairs'),
+      pageSize: z.number().int().positive().optional(),
+      page: z.number().int().positive().optional(),
+      nextPage: z.string().optional(),
+    },
+    tool((a) => searchGemstones(a))
   );
 
   // ---- Orders ----

@@ -106,6 +106,9 @@ Point `command`/`args` at your checkout — useful for development:
 | `advanced_product_filters` | read | Discover the facets you can search on (ProductType, MetalQuality, StoneFamily, …) and their valid values. |
 | `search_products` | read | Filter the catalog by series / category / advanced filters, with `nextPage` paging. |
 | `metal_market_rates` | read | Current Stuller gold/platinum/silver market rates. |
+| `search_diamonds` | read | Search natural diamonds by the 4Cs (carat/color/clarity/cut), shape, certification, and price range. |
+| `search_lab_grown_diamonds` | read | Same as `search_diamonds`, against lab-grown inventory. |
+| `search_gemstones` | read | Search colored gemstones (sapphire, ruby, emerald, …) by type, color, shape, and size. |
 | `order_status` | read | Read order history / status (by order number or date range). |
 | `submit_order` | **write** | Place an order. Dry-run by default; only transmits with `confirm: true`. |
 
@@ -117,6 +120,17 @@ Stuller's product endpoint filters **structurally** — there is no free-text ke
 2. **`search_products`** — pass a chosen facet back in as `advancedProductFilters: [{ Type, Values: [{ DisplayValue, Value }] }]`, optionally combined with `filter` flags (`InStock`, `Orderable`, `OnPriceList`, `Finished`, `BestSeller`). So *"diamond stud earrings"* becomes `ProductType=Earrings` + `StoneFamily=Diamond`.
 
 Page through large result sets with the returned `nextPage` token (`hasMore` tells you when to stop). **Search results carry limited pricing** — re-check chosen SKUs with `pricing_availability` or `product_detail` before quoting.
+
+### Diamond & gemstone search
+
+Loose stones use a different, richer search than the product catalog. `search_diamonds` / `search_lab_grown_diamonds` filter by the **4Cs** plus shape, certification, and ranges:
+
+```jsonc
+// "1–1.5ct, G color, VS1, round, GIA-certified"
+{ "caratMin": 1.0, "caratMax": 1.5, "color": ["G"], "clarity": ["VS1"], "shape": ["Round"], "certification": ["GIA"] }
+```
+
+Filter values are plain codes/words (`color: "G"`, `clarity: "VS1"`, `shape: "Round"`). Results include each stone's specs, price, **certificate number**, and images, with `nextPage` paging and a `totalAvailable` count. `search_gemstones` works the same way for colored stones via `stoneTypes` (e.g. `["Sapphire"]`), `colors`, `shapes`, and mm dimensions.
 
 ### `include` options
 

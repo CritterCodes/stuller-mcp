@@ -33,7 +33,7 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 ## Feature roadmap (ranked by adoption impact)
 
-1. **Diamond & gem search** — wrap `/v2/gem/diamonds`, `/v2/gem/gemstones`, `/v2/gem/labgrowndiamonds`. Search by the 4Cs (carat, cut, color, clarity) + price. The marquee jewelry-trade query; no open MCP does this today.
+1. [x] **Diamond & gem search** — ✅ shipped. `search_diamonds`, `search_lab_grown_diamonds`, `search_gemstones` wrap `/v2/gem/*`; 4Cs + shape + certification + price/carat ranges, paging, cert numbers & images. Verified live.
 2. **Natural-language search resolver** — a single `find_products("diamond stud earrings, white gold")` tool that resolves facets internally (discover → map terms → `search_products`). Fixes the "no free-text keyword search" gap so non-expert agents can use it.
 3. **Stone matching by dimensions** — `/v2/products/bestfitstonesbydimensions`, `/v2/products/searchstones`, `/searchstonesbystonegroup`. "Find a stone to replace a lost 4.1mm round." High value for repair & custom.
 4. **Configurable & virtual products** — `/v2/products/configureproduct`, `/configuredproduct`, `/v2/products/virtual`. Configurable mountings (metal/size/head) + semi-set pieces built for API resale. Unlocks custom design *and* dropship catalogs.
