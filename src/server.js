@@ -328,7 +328,7 @@ export function buildServer() {
 
   server.tool(
     'quote_clear',
-    'Empty a quote.',
+    'Empty a quote — removes all line items. Pass `cartId` to clear a specific named quote (defaults to "default"). Returns the now-empty quote.',
     { cartId: cartIdArg },
     tool((a) => quoteClear(a))
   );

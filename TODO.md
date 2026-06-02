@@ -52,7 +52,8 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 - [ ] **HTTP/SSE transport** alongside stdio, so it can be hosted and used by web clients (big for adoption).
 - [ ] **`--read-only` default** — ordering off unless explicitly enabled. Essential trust signal for a tool strangers run with their own account. (`STULLER_DISABLE_ORDERING` exists today; make safe-by-default.)
-- [ ] **Response cache + light rate-limiting** — be a good Stuller API citizen.
+- [x] **Retry on transient errors** — client retries 429/502/503/504 + network/timeout (STULLER_MAX_RETRIES) with a per-attempt timeout (STULLER_TIMEOUT_MS).
+- [ ] **Response cache** — memoize hot reads (pricing, facets) to be a good Stuller API citizen.
 - [ ] **Dockerfile** for one-command hosting.
 - [ ] **Publish** — npm package + MCP registry / Smithery listing.
 
@@ -68,6 +69,7 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 - Configurable/semi-mount products (`search_virtual_products`, `configure_product`, `get_configured_product`).
 - Order fulfillment: invoices + shipment tracking (`list_invoices`, `get_shipment`).
 - Session quote builder (`quote_add_item`, `quote_view`, `quote_remove_item`, `quote_clear`, `quote_to_order`).
+- **Extensive test suite** — 68 tests across 8 files (transform, resolver, gems, quote, invoices, configurable, client, server, help). Bugs found & fixed in the process: zero-result envelope wrapped as a phantom product; `search_products` guard made dead by always-set Include (catalog-wide fetch risk); one-directional plural matching (singular "earring" missed "Earrings"). HTTP client hardened with per-attempt timeout + retry on transient errors.
 - In-chat docs: server `instructions` (sent at connect) + `get_started` tool (markdown walkthrough), sourced from `src/help.js`.
 - Env-based HTTP Basic auth, `.env.example`, `.gitignore`, smoke script (graceful without creds).
 - All read paths verified against the live Stuller catalog.

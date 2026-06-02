@@ -73,18 +73,22 @@ export async function searchProducts(opts = {}) {
   if (opts.productIds?.length) body.ProductId = opts.productIds;
   if (opts.filter?.length) body.Filter = opts.filter;
   if (opts.advancedProductFilters?.length) body.AdvancedProductFilters = opts.advancedProductFilters;
+
+  // Require a real selector. (Checked before adding Include/paging, which are
+  // always present and would otherwise mask an empty query that fetches the
+  // entire catalog.)
+  if (!Object.keys(body).length) {
+    throw new Error(
+      'Provide at least one filter (series, categoryIds, productIds, filter, or advancedProductFilters).'
+    );
+  }
+
   // Default to a full include so results carry SKU/price/images; without it the
   // search endpoint returns sparse records (no price). Callers can override.
   body.Include = opts.include?.length ? opts.include : ['All'];
   if (opts.pageSize) body.PageSize = opts.pageSize;
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
-
-  if (!Object.keys(body).length) {
-    throw new Error(
-      'Provide at least one filter (series, categoryIds, productIds, filter, or advancedProductFilters).'
-    );
-  }
 
   const payload = await stullerRequest('POST', PRODUCTS_PATH, { body });
   const { products, nextPage } = normalizeProductsResponse(payload);
@@ -177,12 +181,18 @@ function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// All whole-word spans of `token` in the query, with singular/plural tolerance.
+// All whole-word spans of `token` in the query, with BIDIRECTIONAL singular/plural
+// tolerance — so a value token "earrings" matches a query word "earring" and vice
+// versa. (A one-directional `s?` missed the singular-query case.)
 function tokenSpans(query, token) {
   const t = token.replace(/[^a-z0-9]/g, '');
   if (t.length < MIN_TOKEN_LEN) return [];
+  const variants = new Set([t]);
+  if (t.endsWith('s') && t.length > MIN_TOKEN_LEN) variants.add(t.slice(0, -1));
+  else variants.add(`${t}s`);
+  const alt = [...variants].map(escapeRegExp).join('|');
   const spans = [];
-  const re = new RegExp(`\\b${escapeRegExp(t)}s?\\b`, 'g');
+  const re = new RegExp(`\\b(?:${alt})\\b`, 'g');
   let m;
   while ((m = re.exec(query))) spans.push([m.index, m.index + m[0].length]);
   return spans;

@@ -17,8 +17,8 @@ function currencyOf(...candidates) {
   return 'USD';
 }
 
-// Build the shared DiamondRequest body from friendly options.
-function buildDiamondRequest(opts = {}) {
+// Build the shared DiamondRequest body from friendly options. Exported for tests.
+export function buildDiamondRequest(opts = {}) {
   const body = {};
 
   // Ranges are sent as [min, max] decimal collections.
@@ -58,7 +58,7 @@ function normalizeImages(raw = []) {
     .filter((i) => i.full || i.thumbnail);
 }
 
-function transformDiamond(d = {}) {
+export function transformDiamond(d = {}) {
   return {
     serialNumber: d.SerialNumber ?? null,
     shape: d.Shape ?? null,
@@ -92,7 +92,7 @@ function transformDiamond(d = {}) {
   };
 }
 
-function transformGemstone(g = {}) {
+export function transformGemstone(g = {}) {
   return {
     serialNumber: g.SerialNumber ?? null,
     stoneType: g.StoneType ?? g.GemType ?? null,
@@ -206,7 +206,7 @@ export async function searchGemstones(opts = {}) {
 // measured size is to the target.
 
 // Parse "L x W x H" measurement strings like "4.10 x 4.12 x 2.51".
-function parseMeasurements(str) {
+export function parseMeasurements(str) {
   if (typeof str !== 'string') return null;
   const nums = str.match(/[\d.]+/g);
   if (!nums || nums.length < 2) return null;

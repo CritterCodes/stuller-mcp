@@ -4,8 +4,22 @@
 // environment (see .env.example). Credentials are NEVER hard-coded — if they are
 // missing every request fails fast with a message that points at the README.
 
-const BASE_URL = process.env.STULLER_API_URL || 'https://api.stuller.com';
-const USER_AGENT = process.env.STULLER_USER_AGENT || 'stuller-mcp/0.1.0';
+// Config is read at call time (not module load) so env loaded after import — and
+// tests that set env — are honored.
+const baseUrl = () => process.env.STULLER_API_URL || 'https://api.stuller.com';
+const userAgent = () => process.env.STULLER_USER_AGENT || 'stuller-mcp/0.1.0';
+const timeoutMs = () => Number(process.env.STULLER_TIMEOUT_MS) || 30000;
+const maxRetries = () => {
+  const n = Number(process.env.STULLER_MAX_RETRIES);
+  return Number.isFinite(n) && n >= 0 ? n : 2;
+};
+const retryDelayMs = () => {
+  const n = Number(process.env.STULLER_RETRY_DELAY_MS);
+  return Number.isFinite(n) && n >= 0 ? n : 400;
+};
+
+// Transient HTTP statuses worth retrying.
+const RETRYABLE = new Set([429, 502, 503, 504]);
 
 function getCredentials() {
   return {
@@ -13,6 +27,8 @@ function getCredentials() {
     password: process.env.STULLER_PASSWORD,
   };
 }
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** True when both credential env vars are present. */
 export function credentialsConfigured() {
@@ -35,8 +51,42 @@ function authHeader() {
   return 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
 }
 
+// Normalize a documented `api/v2/...` path (or `/api/v2/...`, `v2/...`) to `/v2/...`.
+export function normalizePath(path) {
+  return String(path).replace(/^\/?api\//, '/').replace(/^(?!\/)/, '/');
+}
+
+async function doFetch(method, normalizedPath, opts) {
+  const url = new URL(normalizedPath, baseUrl());
+  if (opts.query) {
+    for (const [key, value] of Object.entries(opts.query)) {
+      if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+    }
+  }
+
+  // Per-attempt timeout so a hung connection can't wedge the server forever.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs());
+  try {
+    return await fetch(url, {
+      method,
+      headers: {
+        Authorization: authHeader(),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': userAgent(),
+      },
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
- * Make an authenticated request to the Stuller API.
+ * Make an authenticated request to the Stuller API. Retries transient failures
+ * (429/502/503/504 and network/timeout errors) up to STULLER_MAX_RETRIES.
  * @param {('GET'|'POST')} method
  * @param {string} path - e.g. '/v2/products' or 'api/v2/orders'
  * @param {{ query?: Record<string, string|number>, body?: object }} [opts]
@@ -44,49 +94,58 @@ function authHeader() {
  */
 export async function stullerRequest(method, path, opts = {}) {
   requireCredentials();
+  const normalizedPath = normalizePath(path);
+  const retries = maxRetries();
 
-  // Stuller's docs reference endpoints as `api/v2/...`; the live host serves them
-  // at `/v2/...`. Accept either form and normalize to `/v2/...`.
-  const normalizedPath = path.replace(/^\/?api\//, '/').replace(/^(?!\/)/, '/');
-  const url = new URL(normalizedPath, BASE_URL);
-
-  if (opts.query) {
-    for (const [key, value] of Object.entries(opts.query)) {
-      if (value !== undefined && value !== null) url.searchParams.set(key, String(value));
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    let res;
+    try {
+      res = await doFetch(method, normalizedPath, opts);
+    } catch (err) {
+      // Network error or timeout (AbortError). Retry, then give a clear message.
+      lastErr =
+        err?.name === 'AbortError'
+          ? new Error(`Stuller ${method} ${normalizedPath} timed out after ${timeoutMs()}ms`)
+          : new Error(`Stuller ${method} ${normalizedPath} network error: ${err.message}`);
+      if (attempt < retries) {
+        await sleep(retryDelayMs() * (attempt + 1));
+        continue;
+      }
+      throw lastErr;
     }
+
+    if (RETRYABLE.has(res.status) && attempt < retries) {
+      await sleep(retryDelayMs() * (attempt + 1));
+      continue;
+    }
+
+    const text = await res.text();
+    let payload;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = text;
+    }
+
+    if (!res.ok) {
+      const detail = typeof payload === 'string' ? payload : JSON.stringify(payload);
+      throw new Error(
+        `Stuller ${method} ${normalizedPath} failed (${res.status}): ${String(detail).slice(0, 400)}`
+      );
+    }
+
+    return payload;
   }
 
-  const res = await fetch(url, {
-    method,
-    headers: {
-      Authorization: authHeader(),
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'User-Agent': USER_AGENT,
-    },
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-
-  const text = await res.text();
-  let payload;
-  try {
-    payload = text ? JSON.parse(text) : null;
-  } catch {
-    payload = text;
-  }
-
-  if (!res.ok) {
-    const detail =
-      typeof payload === 'string' ? payload : JSON.stringify(payload);
-    throw new Error(
-      `Stuller ${method} ${normalizedPath} failed (${res.status}): ${String(detail).slice(0, 400)}`
-    );
-  }
-
-  return payload;
+  throw lastErr; // exhausted retries on transient network errors
 }
 
 export const stullerConfig = {
-  baseUrl: BASE_URL,
-  userAgent: USER_AGENT,
+  get baseUrl() {
+    return baseUrl();
+  },
+  get userAgent() {
+    return userAgent();
+  },
 };

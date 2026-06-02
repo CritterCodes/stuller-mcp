@@ -7,26 +7,41 @@ import {
   summarizePricing,
 } from '../src/stuller/transform.js';
 
-test('normalizeProductsResponse handles the { Products, NextPage } envelope', () => {
-  const { products, nextPage } = normalizeProductsResponse({
-    Products: [{ SKU: 'X' }],
-    NextPage: 'tok',
-  });
-  assert.equal(products.length, 1);
-  assert.equal(nextPage, 'tok');
+// ---- normalizeProductsResponse ----
+
+test('normalizeProductsResponse: { Products, NextPage } envelope', () => {
+  const r = normalizeProductsResponse({ Products: [{ SKU: 'X' }], NextPage: 'tok' });
+  assert.equal(r.products.length, 1);
+  assert.equal(r.nextPage, 'tok');
 });
 
-test('normalizeProductsResponse wraps a bare single object', () => {
-  const { products, nextPage } = normalizeProductsResponse({ SKU: 'X' });
-  assert.equal(products.length, 1);
-  assert.equal(nextPage, null);
+test('normalizeProductsResponse: lowercase products + array input', () => {
+  assert.equal(normalizeProductsResponse({ products: [{}, {}] }).products.length, 2);
+  assert.equal(normalizeProductsResponse([{}, {}, {}]).products.length, 3);
 });
 
-test('normalizeProductsResponse tolerates empty/garbage input', () => {
+test('normalizeProductsResponse: bare single product object is wrapped', () => {
+  const r = normalizeProductsResponse({ SKU: 'ABC', Price: { Value: 1 } });
+  assert.equal(r.products.length, 1);
+  assert.equal(r.products[0].SKU, 'ABC');
+});
+
+test('normalizeProductsResponse: a ZERO-result envelope is NOT a phantom product', () => {
+  // The bug: { PageSize, TotalNumberOfProducts } with no Products array was being
+  // wrapped as one empty product, yielding count:1 with a blank SKU.
+  const r = normalizeProductsResponse({ MetalMarkets: [], PageSize: 25, TotalNumberOfProducts: 0 });
+  assert.equal(r.products.length, 0);
+});
+
+test('normalizeProductsResponse: null / undefined / garbage → empty', () => {
   assert.deepEqual(normalizeProductsResponse(null), { products: [], nextPage: null });
+  assert.deepEqual(normalizeProductsResponse(undefined), { products: [], nextPage: null });
+  assert.deepEqual(normalizeProductsResponse('nonsense'), { products: [], nextPage: null });
 });
 
-test('transformProduct maps core Stuller fields across casings', () => {
+// ---- transformProduct ----
+
+test('transformProduct: maps fields across casings', () => {
   const p = transformProduct({
     SKU: 'SOLDER:0267:P',
     Description: 'Test Solder',
@@ -34,6 +49,7 @@ test('transformProduct maps core Stuller fields across casings', () => {
     OnHand: 3,
     Orderable: true,
     Status: 'In Stock',
+    GramWeight: 1.2,
   });
   assert.equal(p.itemNumber, 'SOLDER:0267:P');
   assert.equal(p.description, 'Test Solder');
@@ -41,13 +57,48 @@ test('transformProduct maps core Stuller fields across casings', () => {
   assert.equal(p.currency, 'USD');
   assert.equal(p.stock.onHand, 3);
   assert.equal(p.stock.orderable, true);
+  assert.equal(p.gramWeight, 1.2);
 });
 
-test('summarizePricing projects only the money + stock fields', () => {
-  const summary = summarizePricing(
-    transformProduct({ SKU: 'A', Price: { Value: 9.99 }, OnHand: 1, Orderable: false })
+test('transformProduct: empty input does not throw and defaults sanely', () => {
+  const p = transformProduct({});
+  assert.equal(p.price, 0);
+  assert.equal(p.currency, 'USD');
+  assert.deepEqual(p.images, []);
+  assert.equal(p.source, 'stuller-api-v2');
+});
+
+test('transformProduct: itemNumber falls back to the passed sku argument', () => {
+  assert.equal(transformProduct({}, 'FALLBACK:1').itemNumber, 'FALLBACK:1');
+});
+
+test('transformProduct: images normalize from strings and objects', () => {
+  const fromObj = transformProduct({ Images: [{ FullUrl: 'a', ThumbnailUrl: 'b' }] });
+  assert.equal(fromObj.images[0].full, 'a');
+  assert.equal(fromObj.images[0].thumbnail, 'b');
+  const fromStr = transformProduct({ images: ['http://x/y.jpg'] });
+  assert.equal(fromStr.images[0].full, 'http://x/y.jpg');
+  // Non-array images must not throw.
+  assert.deepEqual(transformProduct({ Images: 'oops' }).images, []);
+});
+
+test('transformProduct: descriptive elements feed metal + specifications', () => {
+  const p = transformProduct({
+    DescriptiveElementGroup: {
+      DescriptiveElements: [{ Name: 'Quality', Value: '14KW', DisplayValue: '14K White Gold' }],
+    },
+  });
+  assert.equal(p.metal.type, '14K White Gold');
+  assert.equal(p.specifications.Quality.displayValue, '14K White Gold');
+});
+
+// ---- summarizePricing ----
+
+test('summarizePricing: projects exactly the money + stock fields', () => {
+  const s = summarizePricing(
+    transformProduct({ SKU: 'A', Price: { Value: 9.99, CurrencyCode: 'USD' }, OnHand: 1, Orderable: false })
   );
-  assert.deepEqual(Object.keys(summary).sort(), [
+  assert.deepEqual(Object.keys(s).sort(), [
     'availability',
     'currency',
     'description',
@@ -59,153 +110,6 @@ test('summarizePricing projects only the money + stock fields', () => {
     'showcasePrice',
     'status',
   ]);
-});
-
-test('the MCP server builds and registers tools without credentials', async () => {
-  const { buildServer } = await import('../src/server.js');
-  const server = buildServer();
-  assert.ok(server, 'buildServer() should return a server');
-});
-
-test('resolveProductFacets maps NL queries and disambiguates white-gold vs white-stone', async () => {
-  const { resolveProductFacets } = await import('../src/tools/products.js');
-  const facets = [
-    { type: 'ProductType', values: [{ displayValue: 'Earrings', value: 'Earrings' }, { displayValue: 'Rings', value: 'Rings' }, { displayValue: 'Bracelets', value: 'Bracelets' }] },
-    { type: 'MetalQuality', values: [{ displayValue: '10K White Gold', value: '10K White Gold' }, { displayValue: '14K White Gold', value: '14K White Gold' }, { displayValue: 'Sterling Silver', value: 'Sterling Silver' }] },
-    { type: 'StoneFamily', values: [{ displayValue: 'Diamond', value: 'Diamond' }, { displayValue: 'Sapphire', value: 'Sapphire' }] },
-    { type: 'StoneColor', values: [{ displayValue: 'White', value: 'White' }, { displayValue: 'G', value: 'G' }, { displayValue: 'D', value: 'D' }] },
-  ];
-
-  const a = resolveProductFacets('white gold diamond stud earrings', facets);
-  const types = Object.fromEntries(a.resolved.map((r) => [r.type, r.values.map((v) => v.displayValue)]));
-  assert.deepEqual(types.MetalQuality, ['10K White Gold', '14K White Gold'], 'both white-gold karats');
-  assert.deepEqual(types.ProductType, ['Earrings'], '"earrings" must not match "Rings"');
-  assert.deepEqual(types.StoneFamily, ['Diamond']);
-  assert.ok(!types.StoneColor, '"white" is consumed by the metal, not StoneColor');
-  assert.ok(!('G' in (types.StoneColor || [])), 'short grade codes never substring-match');
-
-  // Without "gold", "white" is correctly read as a stone color.
-  const b = resolveProductFacets('white diamond', facets);
-  const bt = Object.fromEntries(b.resolved.map((r) => [r.type, r.values.map((v) => v.displayValue)]));
-  assert.deepEqual(bt.StoneColor, ['White']);
-  assert.deepEqual(bt.StoneFamily, ['Diamond']);
-  assert.ok(!bt.MetalQuality, 'no metal without a metal word');
-
-  // Filter detection + unmatched reporting.
-  const c = resolveProductFacets('sterling silver bracelet in stock with engraving', facets);
-  assert.deepEqual(c.detectedFilters, ['InStock']);
-  assert.ok(c.unmatchedTerms.includes('engraving'), 'unmapped terms are reported');
-});
-
-test('stoneDimensions falls back to length when width is 0 (round stones)', async () => {
-  const { stoneDimensions } = await import('../src/tools/gems.js');
-  // Round gemstone: Width reported as 0 → should mirror length.
-  assert.deepEqual(stoneDimensions({ dimensions: { length: 5.0, width: 0 } }, 'gemstone'), {
-    length: 5.0,
-    width: 5.0,
-  });
-  // Diamond with explicit L×W.
-  assert.deepEqual(stoneDimensions({ length: 6.1, width: 4.0 }, 'diamond'), { length: 6.1, width: 4.0 });
-  // Diamond falling back to parsed measurements.
-  assert.deepEqual(stoneDimensions({ measurements: '4.10 x 4.12 x 2.51' }, 'diamond'), {
-    length: 4.1,
-    width: 4.12,
-  });
-  // Diamond round via mmSize only.
-  assert.deepEqual(stoneDimensions({ mmSize: 4.1 }, 'diamond'), { length: 4.1, width: 4.1 });
-  // No usable dimensions.
-  assert.equal(stoneDimensions({}, 'gemstone'), null);
-});
-
-test('transformVirtual surfaces baseProductId and the configuration model', async () => {
-  const { transformVirtual } = await import('../src/tools/configurable.js');
-  const v = transformVirtual({
-    SKU: 'CONFIG.123',
-    Price: { Value: 985.8, CurrencyCode: 'USD' },
-    BaseProduct: { Id: 22145800, SKU: 'BASE:1' },
-    ConfigurationModel: {
-      Id: 966053,
-      IsPegHeadable: true,
-      SettingOptions: [{ LocationNumber: 1, Shape: 'Marquise', SizeMM: 7, Dimension1: 7, Dimension2: 3.5, SettingType: 'Prong' }],
-    },
-    CanBeSetWith: [{ Quantity: 1, Shape: 'MARQUISE', Size: '7.00', SettingType: 'PR' }],
-  });
-  // The gotcha: configure_product needs BaseProduct.Id, NOT ConfigurationModel.Id.
-  assert.equal(v.baseProductId, 22145800);
-  assert.equal(v.configurationModelId, 966053);
-  assert.equal(v.price, 985.8);
-  assert.equal(v.settingOptions[0].shape, 'Marquise');
-  assert.equal(v.settingOptions[0].dimensions.d2, 3.5);
-  assert.equal(v.canBeSetWith[0].size, '7.00');
-});
-
-test('transformInvoice surfaces tracking, totals, and backorder counts', async () => {
-  const { transformInvoice } = await import('../src/tools/invoices.js');
-  const i = transformInvoice({
-    InvoiceNumber: 48172755,
-    OrderNumber: 36668334,
-    Status: 'Closed',
-    TrackingNumber: '649514744407',
-    TrackingLink: 'https://www.fedex.com/fedextrack/?trknbr=649514744407',
-    ShipMethod: 'FED_STD_OVERNIGHT',
-    OrderTotal: 261.61,
-    InvoiceTotal: { Value: 291.5, CurrencyCode: 'USD' }, // money helper handles both shapes
-    InvoiceDetails: [
-      { LineNumber: 1, ItemNumber: 'A', ShipQuantity: 1, BackOrderedQuantity: 0, UnitPrice: 10, LineTotal: 10 },
-      { LineNumber: 2, ItemNumber: 'B', ShipQuantity: 0, BackOrderedQuantity: 2, UnitPrice: 5, LineTotal: 0 },
-    ],
-  });
-  assert.equal(i.tracking.number, '649514744407');
-  assert.equal(i.tracking.link.includes('fedextrack'), true);
-  assert.equal(i.totals.order, 261.61);
-  assert.equal(i.totals.invoice, 291.5, 'money helper unwraps {Value}');
-  assert.equal(i.lineItems.length, 2);
-  assert.equal(i.backorderedItems, 1, 'one line is back-ordered');
-});
-
-test('quote builder computes totals and handles manual lines (no network)', async () => {
-  const { quoteAdd, quoteRemove, quoteView, quoteToOrder, summarizeCart, _resetCartsForTest } = await import(
-    '../src/tools/quote.js'
-  );
-  _resetCartsForTest();
-
-  // summarizeCart is pure.
-  const s = summarizeCart([
-    { source: 'stuller', sku: 'A', quantity: 3, unitPrice: 10, currency: 'USD', orderable: true },
-    { source: 'manual', sku: null, description: 'Labor', quantity: 1, unitPrice: 75, currency: 'USD' },
-  ]);
-  assert.equal(s.subtotal, 105);
-  assert.equal(s.totalQuantity, 4);
-  assert.equal(s.flags.hasManualLines, true);
-
-  // Manual add/remove needs no network.
-  const cartId = 'test-cart';
-  await quoteAdd({ cartId, description: 'Bench labor', unitPrice: 75, quantity: 2 });
-  let v = await quoteView({ cartId });
-  assert.equal(v.subtotal, 150);
-  assert.equal(v.itemCount, 1);
-
-  // Manual lines are excluded from an order.
-  const o = quoteToOrder({ cartId });
-  assert.equal(o.lines.length, 0);
-  assert.equal(o.excluded.length, 1);
-
-  v = quoteRemove({ cartId, index: 1 });
-  assert.equal(v.itemCount, 0);
-});
-
-test('the server advertises instructions at connect', async () => {
-  const { buildServer } = await import('../src/server.js');
-  const server = buildServer();
-  // McpServer wraps the low-level Server, which stores instructions for the
-  // initialize result. Guard that ours is actually wired through.
-  assert.ok(server.server._instructions, 'server instructions should be set');
-});
-
-test('the usage guide covers the core concepts', async () => {
-  const { SERVER_INSTRUCTIONS, USAGE_GUIDE } = await import('../src/help.js');
-  assert.ok(SERVER_INSTRUCTIONS.length > 200, 'instructions should be substantive');
-  for (const concept of ['search_diamonds', 'advanced_product_filters', 'dry run', 'pricing']) {
-    assert.ok(USAGE_GUIDE.includes(concept), `guide should mention "${concept}"`);
-  }
+  assert.equal(s.price, 9.99);
+  assert.equal(s.orderable, false);
 });
