@@ -51,6 +51,15 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 - [x] **Sized image variants** — confirmed Stuller CDN size tokens empirically (tiny 40 / thumb 75 / list 165 / standard 300 / xlarge 640 / zoom 1500; unknown tokens + WxH ignored → original). `sizedImageUrl()` helper + `show_product` `size` option. Verified live.
 - [ ] Future: push-to-screen integration for the parked voice assistant.
 
+## Test-sweep fixes (2026-06-02)
+
+From a full live QA sweep:
+- [x] **Output-size blowups** — search_products/find_products now return LEAN cards by default (+ `full:true`) and default pageSize 10 (was 500 full objects → 2.7M chars, now ~4K). advanced_product_filters returns types+counts+sample by default (+ `facetType` for one facet's full list; 181K→2.3K). list_invoices defaults to 25 + omits line items unless `includeLineItems` (203K→13K). search_virtual_products dedupes setWith + default page 10.
+- [x] **Lab-grown bug** — response nests under `LabGrownDiamonds`/`TotalNumberOfLabGrownDiamonds`, not `Diamonds`; unwrap was returning 0 always. Fixed (8049 total now).
+- [x] **order_status 500** — Stuller's /v2/orders 500s (account-gated). Now degrades gracefully with a note pointing to list_invoices.
+- [x] **Docs** — gemstone `colors` filter is unreliable (rejects record codes, ignores words) + endpoint returns empty first pages → documented; configure_product returns no configurationId → get_configured_product description clarified.
+- [ ] **discover_categories "stud" = 0** — account-data dependent (this login's earrings aren't tagged with stud categories in the scanned slice); works for rings. Revisit on a fuller catalog / deeper scan.
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.

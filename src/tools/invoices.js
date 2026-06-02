@@ -84,7 +84,13 @@ export async function listInvoices(opts = {}) {
     withBackorders: invoices.filter((i) => i.backorderedItems > 0).length,
   };
   const totalMatched = invoices.length;
-  if (opts.limit) invoices = invoices.slice(0, opts.limit);
+
+  // Default to a small page — the full set (100s of invoices × line items) blows
+  // past token limits. Line items are omitted unless asked for (backorderedItems
+  // keeps the count); narrow with date range / orderNumber / onlyShipped for more.
+  const limit = opts.limit || 25;
+  invoices = invoices.slice(0, limit);
+  if (!opts.includeLineItems) invoices = invoices.map(({ lineItems, ...rest }) => rest);
 
   return {
     dateFrom,
@@ -92,6 +98,7 @@ export async function listInvoices(opts = {}) {
     count: invoices.length,
     totalMatched,
     summary,
+    lineItemsIncluded: Boolean(opts.includeLineItems),
     invoices,
   };
 }

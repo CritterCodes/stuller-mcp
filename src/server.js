@@ -7,7 +7,7 @@ import {
   pricingAvailability,
   searchProducts,
   metalMarketRates,
-  advancedProductFilters,
+  advancedProductFiltersSummary,
   findProducts,
   discoverCategories,
 } from './tools/products.js';
@@ -101,31 +101,29 @@ export function buildServer() {
         .array(z.string())
         .optional()
         .describe('Extra ProductFilter flags (InStock/Orderable/OnPriceList/Finished/BestSeller); in-stock/best-seller phrasing in the query is auto-detected'),
-      pageSize: z.number().int().positive().optional(),
+      pageSize: z.number().int().positive().optional().describe('Results per page (default 10)'),
       page: z.number().int().positive().optional(),
       nextPage: z.string().optional().describe('Paging token from a prior call'),
+      full: z.boolean().optional().describe('Return complete product objects instead of lean cards (heavy — avoid for many results)'),
     },
     tool((a) => findProducts(a))
   );
 
   server.tool(
     'advanced_product_filters',
-    'Discover the faceted filters available for search_products: returns facet types (ProductType, MetalQuality, StoneFamily, StoneShape, StoneColor, StoneQuality, StoneUniqueness, StoneCut, StoneSize) and each one\'s valid { displayValue, value } options. Call this FIRST when you don\'t already know exact filter values, then feed a chosen type+value into search_products `advancedProductFilters`. Optionally scope by categoryIds/series/filter to get values for just that slice of the catalog. No arguments returns the full global facet set.',
+    'Discover the faceted filters for search_products. With no args, returns the facet TYPES (ProductType, MetalQuality, StoneFamily, StoneShape, StoneColor, StoneQuality, StoneUniqueness, StoneCut, StoneSize) with a value count + small sample each (the full lists are huge). Pass `facetType` (e.g. "MetalQuality") to get that one facet\'s complete value list, then feed a value into search_products `advancedProductFilters`. Optionally scope by categoryIds/series/filter. (Often you can skip this and just use find_products with a plain-language query.)',
     {
+      facetType: z.string().optional().describe('Return the full value list for one facet, e.g. "ProductType", "MetalQuality"'),
       categoryIds: z.array(z.number().int()).optional().describe('Scope facets to these Stuller category IDs'),
       series: z.array(z.string()).optional().describe('Scope facets to these series numbers'),
       filter: z.array(z.string()).optional().describe('ProductFilter flags: None, Orderable, InStock, OnPriceList, Finished, BestSeller'),
-      advancedProductFilters: z
-        .array(z.record(z.any()))
-        .optional()
-        .describe('Already-chosen facets, to get the remaining valid values given those selections'),
     },
-    tool((a) => advancedProductFilters(a))
+    tool((a) => advancedProductFiltersSummary(a))
   );
 
   server.tool(
     'search_products',
-    'Filter the Stuller catalog and page through results. This is a STRUCTURAL filter, not free-text keyword search: narrow by `series` (e.g. ["309"]), `categoryIds`, `productIds`, `filter` flags, or `advancedProductFilters`. If you don\'t already know valid facet values, call advanced_product_filters FIRST to discover them. Search results carry limited pricing — re-check chosen SKUs with pricing_availability/product_detail before quoting. Returns transformed products plus a `nextPage` token — pass it back as `nextPage` to fetch the next page (hasMore tells you when to stop).',
+    'Filter the Stuller catalog and page through results. This is a STRUCTURAL filter, not free-text keyword search: narrow by `series` (e.g. ["309"]), `categoryIds`, `productIds`, `filter` flags, or `advancedProductFilters`. If you don\'t already know valid facet values, call advanced_product_filters FIRST (or just use find_products). Returns LEAN product cards (itemNumber, title, price, availability, primaryImage, categoryIds) by default and a small page (10) — page with `nextPage`, set `full: true` for complete objects, and re-check chosen SKUs with pricing_availability/product_detail before quoting.',
     {
       series: z.array(z.string()).optional().describe('Series numbers, e.g. ["309", "1601"]'),
       categoryIds: z.array(z.number().int()).optional().describe('Stuller category IDs'),
@@ -139,9 +137,10 @@ export function buildServer() {
         .optional()
         .describe('Advanced filter objects: { Type, Values: [{ DisplayValue, Value }] }'),
       include: z.array(z.string()).optional().describe('Optional ProductInclude values'),
-      pageSize: z.number().int().positive().optional().describe('Results per page (max 500)'),
+      pageSize: z.number().int().positive().optional().describe('Results per page (default 10)'),
       page: z.number().int().positive().optional().describe('Page number (alternative to nextPage)'),
       nextPage: z.string().optional().describe('Paging token returned by a prior call'),
+      full: z.boolean().optional().describe('Return complete product objects instead of lean cards'),
     },
     tool((a) => searchProducts(a))
   );
@@ -236,10 +235,10 @@ export function buildServer() {
 
   server.tool(
     'search_gemstones',
-    'Search Stuller\'s colored gemstone inventory (sapphire, ruby, emerald, etc.). Filter by `stoneTypes` (e.g. ["Sapphire"]), `colors`, `shapes`, and `length`/`width` in mm; `filters` accepts Option/Value pairs (e.g. { Option: "SizeTypeCarat", Value: "..." }). Returns each stone\'s type, color, carat, price, dimensions, certification, and images, with `nextPage` paging + `totalAvailable`.',
+    'Search Stuller\'s colored gemstone inventory (sapphire, ruby, emerald, etc.). Filter by `stoneTypes` (e.g. ["Sapphire"]) — the most reliable filter — plus `shapes` and `length`/`width` in mm. NOTE: Stuller\'s `colors` filter is unreliable (it rejects the record color codes and matches nothing for plain words like "Blue"), and the gemstone endpoint sometimes returns an empty first page despite a non-zero total — page with `nextPage` to pull results. To match a size for a setting, prefer find_stones_by_dimensions. Returns type, color, carat, price, dimensions, certification, images.',
     {
-      stoneTypes: z.array(z.string()).optional().describe('Gem types, e.g. ["Sapphire","Ruby","Emerald"]'),
-      colors: z.array(z.string()).optional(),
+      stoneTypes: z.array(z.string()).optional().describe('Gem types, e.g. ["Sapphire","Ruby","Emerald"] — the reliable filter'),
+      colors: z.array(z.string()).optional().describe('Unreliable on Stuller\'s side; prefer filtering by stoneType then reviewing the color field'),
       shapes: z.array(z.string()).optional().describe('e.g. ["Round","Oval","Cushion"]'),
       length: z.number().positive().optional().describe('Length in mm'),
       width: z.number().positive().optional().describe('Width in mm'),
@@ -336,7 +335,7 @@ export function buildServer() {
 
   server.tool(
     'get_configured_product',
-    'Retrieve a previously configured item by its configuration id (e.g. one returned from configure_product as `configurationId`). Returns SKU, pricing, availability, ship date, and the configured selections.',
+    'Retrieve a previously configured item by its configuration id. Returns SKU, pricing, availability, ship date, and the configured selections. NOTE: configure_product does not currently return a configurationId, so use this only when you already have an id from elsewhere (e.g. a saved configuration); to just price a configuration, call configure_product directly.',
     {
       configurationId: z.number().int().describe('The configuration id of an existing configured product'),
       include: z.array(z.string()).optional(),
@@ -402,7 +401,7 @@ export function buildServer() {
 
   server.tool(
     'list_invoices',
-    'List invoices for a date range — the fulfillment & tracking view. Each invoice includes shipment tracking (number + carrier link + method), order/invoice numbers, totals, ship-to address, and line items with back-ordered quantities. Use this to answer "did my order ship / what\'s the tracking / what\'s backordered". Defaults to the last 90 days. `onlyShipped`/`onlyOpen` narrow the set. NOTE: Stuller filters invoices only by date; orderNumber/invoiceNumber/purchaseOrderNumber narrowing is applied locally, so keep the date window around the order you want.',
+    'List invoices for a date range — the fulfillment & tracking view. Each invoice includes shipment tracking (number + carrier link + method), order/invoice numbers, totals, ship-to, and a back-ordered-line count. Use this to answer "did my order ship / what\'s the tracking / what\'s backordered". Defaults to the last 90 days, **25 invoices**, and OMITS line items (set `includeLineItems: true` for them). `onlyShipped`/`onlyOpen` narrow the set; `summary` reports shipped/backorder counts over the full match. NOTE: Stuller filters invoices only by date; orderNumber/invoiceNumber/purchaseOrderNumber narrowing is applied locally, so keep the date window around the order you want.',
     {
       dateFrom: z.string().optional().describe('ISO date (default: 90 days ago)'),
       dateTo: z.string().optional().describe('ISO date (default: today)'),
@@ -411,7 +410,8 @@ export function buildServer() {
       purchaseOrderNumber: z.string().optional(),
       onlyShipped: z.boolean().optional().describe('Only invoices that have a tracking number'),
       onlyOpen: z.boolean().optional().describe('Exclude closed invoices'),
-      limit: z.number().int().positive().optional(),
+      includeLineItems: z.boolean().optional().describe('Include each invoice\'s line items (heavier)'),
+      limit: z.number().int().positive().optional().describe('Max invoices to return (default 25)'),
     },
     tool((a) => listInvoices(a))
   );

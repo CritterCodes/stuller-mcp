@@ -142,6 +142,7 @@ function unwrap(payload, listKeys) {
         nextPage: payload.NextPage ?? payload.nextPage ?? null,
         total:
           payload.TotalNumberOfDiamonds ??
+          payload.TotalNumberOfLabGrownDiamonds ??
           payload.TotalNumberOfGemstones ??
           payload.Total ??
           payload[key].length,
@@ -154,7 +155,8 @@ function unwrap(payload, listKeys) {
 async function diamondSearch(path, opts) {
   const body = buildDiamondRequest(opts);
   const payload = await stullerRequest('POST', path, { body });
-  const { items, nextPage, total } = unwrap(payload, ['Diamonds', 'diamonds']);
+  // Natural diamonds nest under Diamonds; lab-grown under LabGrownDiamonds.
+  const { items, nextPage, total } = unwrap(payload, ['Diamonds', 'diamonds', 'LabGrownDiamonds', 'labGrownDiamonds']);
   return {
     count: items.length,
     totalAvailable: total,

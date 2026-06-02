@@ -17,7 +17,19 @@ export async function orderStatus(opts = {}) {
   if (opts.orderNumber) query.orderNumber = opts.orderNumber;
   if (opts.since) query.dateFrom = opts.since;
   if (opts.until) query.dateTo = opts.until;
-  return stullerRequest('GET', ORDERS_PATH, { query });
+  try {
+    return await stullerRequest('GET', ORDERS_PATH, { query });
+  } catch (err) {
+    // Stuller's /v2/orders frequently 500s / is gated by account. Degrade to a
+    // clear pointer rather than a raw error — list_invoices is the working path
+    // for "did it ship / what's the tracking".
+    return {
+      available: false,
+      error: err.message,
+      note:
+        "Stuller's order-status endpoint returned an error (it is often account-gated). For shipment status and tracking numbers, use list_invoices (filter with onlyShipped + a date range).",
+    };
+  }
 }
 
 /**

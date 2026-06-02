@@ -87,18 +87,38 @@ export async function searchProducts(opts = {}) {
   // Default to a full include so results carry SKU/price/images; without it the
   // search endpoint returns sparse records (no price). Callers can override.
   body.Include = opts.include?.length ? opts.include : ['All'];
-  if (opts.pageSize) body.PageSize = opts.pageSize;
+  // Default to a SMALL page. Stuller defaults to 500 full products (~MBs), which
+  // overflows token limits — callers page with nextPage instead.
+  body.PageSize = opts.pageSize || 10;
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 
   const payload = await stullerRequest('POST', PRODUCTS_PATH, { body });
   const { products, nextPage } = normalizeProductsResponse(payload);
+  const transformed = products.map((p) => transformProduct(p));
 
   return {
-    count: products.length,
+    count: transformed.length,
     nextPage, // pass back into `nextPage` on the next call to page through results
     hasMore: Boolean(nextPage),
-    products: products.map((p) => transformProduct(p)),
+    // Lean cards by default to stay under token limits; `full: true` returns the
+    // complete product objects (heavy). For one item, prefer product_detail.
+    products: opts.full ? transformed : transformed.map(productCard),
+  };
+}
+
+// Compact, render-ready card derived from a transformed product. Keeps results
+// small; use product_detail / get_products for full specs, media, and categories.
+export function productCard(t) {
+  return {
+    itemNumber: t.itemNumber,
+    title: t.display?.title ?? t.description ?? null,
+    price: t.display?.price ?? t.price ?? null,
+    currency: t.display?.currency ?? t.currency ?? 'USD',
+    available: t.stock?.available ?? null,
+    orderable: t.stock?.orderable ?? null,
+    primaryImage: t.display?.primaryImage ?? null,
+    categoryIds: (t.webCategories || []).map((c) => c.id),
   };
 }
 
@@ -158,6 +178,40 @@ export async function advancedProductFilters(opts = {}) {
 }
 
 /**
+ * Tool-facing, token-friendly view of the facet vocabulary. The full value lists
+ * are huge (MetalQuality/StoneFamily have hundreds of entries), so by default
+ * this returns facet types + counts + a small sample. Pass `facetType` to get one
+ * facet's complete value list.
+ * @param {{ facetType?:string, categoryIds?:number[], series?:string[], filter?:string[] }} opts
+ */
+export async function advancedProductFiltersSummary(opts = {}) {
+  const { facets } = await advancedProductFilters({
+    categoryIds: opts.categoryIds,
+    series: opts.series,
+    filter: opts.filter,
+  });
+
+  if (opts.facetType) {
+    const f = facets.find((x) => String(x.type).toLowerCase() === String(opts.facetType).toLowerCase());
+    if (!f) {
+      throw new Error(`Unknown facetType "${opts.facetType}". Available: ${facets.map((x) => x.type).join(', ')}.`);
+    }
+    return { facetType: f.type, valueCount: f.valueCount, values: f.values };
+  }
+
+  return {
+    facetCount: facets.length,
+    facetTypes: facets.map((f) => f.type),
+    facets: facets.map((f) => ({
+      type: f.type,
+      valueCount: f.valueCount,
+      sampleValues: f.values.slice(0, 10).map((v) => v.displayValue),
+    })),
+    usage: 'Call again with facetType:"MetalQuality" (etc.) for that facet\'s full value list, then pass a value into search_products advancedProductFilters. Or just use find_products with a plain-language query.',
+  };
+}
+
+/**
  * Discover merchandising categories (and their CategoryIds) by scanning products.
  * Stuller exposes no category-tree endpoint, but products carry `WebCategories`
  * ({ id, name, path }) whose ids ARE valid CategoryIds. This scans a slice of the
@@ -208,6 +262,7 @@ export async function discoverCategories(opts = {}) {
       advancedProductFilters: apf.length ? apf : undefined,
       pageSize,
       nextPage,
+      full: true, // need each product's full webCategories (id+name+path)
     });
     for (const p of res.products) {
       for (const c of p.webCategories || []) {
@@ -382,7 +437,7 @@ export function resolveProductFacets(query, facets = []) {
  * (`resolvedFilters`) alongside the products so the caller can correct it.
  * @param {{ query: string, filter?: string[], pageSize?: number, page?: number, nextPage?: string }} opts
  */
-export async function findProducts({ query, filter, pageSize, page, nextPage } = {}) {
+export async function findProducts({ query, filter, pageSize, page, nextPage, full } = {}) {
   if (!query || !query.trim()) throw new Error('`query` is required.');
 
   const { facets } = await advancedProductFilters({});
@@ -430,6 +485,7 @@ export async function findProducts({ query, filter, pageSize, page, nextPage } =
     pageSize,
     page,
     nextPage,
+    full,
   });
 
   const fmt = (list) => list.map((r) => ({ type: r.type, values: r.values.map((v) => v.displayValue) }));

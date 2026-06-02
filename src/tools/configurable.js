@@ -9,6 +9,18 @@ const CONFIGURED_PATH = '/v2/products/configuredproduct';
 // (ring sizes, setting locations, compatible stones) only populates with includes.
 const DEFAULT_INCLUDE = ['All'];
 
+function dedupeBy(arr, keyFn) {
+  const seen = new Set();
+  const out = [];
+  for (const item of arr) {
+    const k = keyFn(item);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
+}
+
 function transformVirtual(p = {}) {
   const cm = p.ConfigurationModel || {};
   const base = p.BaseProduct || {};
@@ -48,7 +60,8 @@ function transformVirtual(p = {}) {
       size: c.Size,
       settingType: c.SettingType,
     })),
-    setWith: p.SetWith || [],
+    // SetWith often repeats the same placeholder stone SKU dozens of times — dedupe.
+    setWith: dedupeBy(p.SetWith || [], (s) => s.SKU ?? s.sku ?? JSON.stringify(s)),
     images: productImages,
     fullySetImages,
     // Prefer the finished (set) look for display when available.
@@ -79,7 +92,7 @@ export async function searchVirtualProducts(opts = {}) {
   if (opts.filter?.length) body.Filter = opts.filter;
   if (opts.advancedProductFilters?.length) body.AdvancedProductFilters = opts.advancedProductFilters;
   body.Include = opts.include?.length ? opts.include : DEFAULT_INCLUDE;
-  if (opts.pageSize) body.PageSize = opts.pageSize;
+  body.PageSize = opts.pageSize || 10; // virtual products are heavy — default a small page
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 

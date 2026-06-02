@@ -40,6 +40,20 @@ test('transformVirtual: display prefers the fully-set (finished) image', () => {
   assert.equal(v.display.primaryImage, 'http://img/with-stone.jpg', 'finished look wins');
 });
 
+test('transformVirtual: setWith is de-duplicated (was repeating ~25×)', () => {
+  const v = transformVirtual({
+    SKU: 'X',
+    SetWith: [
+      { SKU: 'DIAMOND-GEN', Quantity: 1 },
+      { SKU: 'DIAMOND-GEN', Quantity: 1 },
+      { SKU: 'DIAMOND-GEN', Quantity: 1 },
+      { SKU: 'OTHER', Quantity: 1 },
+    ],
+  });
+  assert.equal(v.setWith.length, 2, 'duplicate SKUs collapsed');
+  assert.deepEqual(v.setWith.map((s) => s.SKU), ['DIAMOND-GEN', 'OTHER']);
+});
+
 test('transformVirtual: missing config model / base product → safe defaults', () => {
   const v = transformVirtual({ SKU: 'X' });
   assert.equal(v.baseProductId, null);
