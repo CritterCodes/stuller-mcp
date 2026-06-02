@@ -1,0 +1,13 @@
+# Secrets — NEVER commit your Stuller credentials.
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Logs / OS cruft
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

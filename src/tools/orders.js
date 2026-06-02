@@ -1,0 +1,85 @@
+import { stullerRequest } from '../stuller/client.js';
+
+const ORDERS_PATH = '/v2/orders';
+const SUBMIT_ORDER_PATH = '/v2/orders/submitorder';
+
+function orderingDisabled() {
+  return String(process.env.STULLER_DISABLE_ORDERING || '').toLowerCase() === 'true';
+}
+
+/**
+ * Read order history / status. With no arguments returns recent orders; pass a
+ * date range or order number to narrow. Read-only.
+ * @param {{ orderNumber?: string, since?: string, until?: string }} opts
+ */
+export async function orderStatus(opts = {}) {
+  const query = {};
+  if (opts.orderNumber) query.orderNumber = opts.orderNumber;
+  if (opts.since) query.dateFrom = opts.since;
+  if (opts.until) query.dateTo = opts.until;
+  return stullerRequest('GET', ORDERS_PATH, { query });
+}
+
+/**
+ * Submit an order to Stuller. WRITE PATH — defaults to a DRY RUN: it assembles
+ * and returns the exact request body WITHOUT sending it. Pass confirm: true to
+ * actually transmit. Honors STULLER_DISABLE_ORDERING as a hard kill switch.
+ *
+ * @param {object} spec - { lines: [{ sku|itemNumber, quantity }], shipToAddress?,
+ *   billToAddress?, contact?, payment?, purchaseOrderNumber?, comments?, ...passthrough }
+ * @param {boolean} confirm - when true, transmit; otherwise return a preview
+ */
+export async function submitOrder(spec = {}, confirm = false) {
+  const lines = (spec.lines || spec.Lines || []).map((line) => ({
+    ItemNumber: line.itemNumber || line.sku || line.ItemNumber || line.SKU,
+    Quantity: line.quantity ?? line.Quantity ?? 1,
+    ...(line.comments || line.Comments ? { Comments: line.comments || line.Comments } : {}),
+  }));
+
+  if (!lines.length || lines.some((l) => !l.ItemNumber)) {
+    throw new Error('Each order line needs an itemNumber/sku and quantity. `lines` is required.');
+  }
+
+  // Assemble the Stuller submitorder body. Known sections are mapped explicitly;
+  // anything else on `spec` (minus our helper keys) is passed through verbatim so
+  // callers can supply fields this wrapper does not model yet.
+  const { lines: _l, Lines: _L, confirm: _c, shipToAddress, billToAddress, contact, payment,
+    purchaseOrderNumber, customerData, comments, ...passthrough } = spec;
+
+  const body = {
+    Lines: lines,
+    ...(shipToAddress ? { ShipToAddress: shipToAddress } : {}),
+    ...(billToAddress ? { BillToAddress: billToAddress } : {}),
+    ...(contact ? { Contact: contact } : {}),
+    ...(payment ? { Payment: payment } : {}),
+    ...(purchaseOrderNumber ? { PurchaseOrderNumber: purchaseOrderNumber } : {}),
+    ...(customerData ? { CustomerData: customerData } : {}),
+    ...(comments ? { Comments: comments } : {}),
+    ...passthrough,
+  };
+
+  if (orderingDisabled()) {
+    return {
+      action: 'blocked',
+      reason: 'ordering_disabled',
+      message:
+        'Order submission is disabled via STULLER_DISABLE_ORDERING=true. Unset it to allow orders. The assembled body is shown below for review.',
+      lineCount: lines.length,
+      body,
+    };
+  }
+
+  if (!confirm) {
+    return {
+      action: 'preview',
+      message:
+        'Dry run — nothing sent to Stuller. Review the order body below, then call again with confirm: true to transmit.',
+      wouldPostTo: SUBMIT_ORDER_PATH,
+      lineCount: lines.length,
+      body,
+    };
+  }
+
+  const result = await stullerRequest('POST', SUBMIT_ORDER_PATH, { body });
+  return { action: 'submitted', request: { lineCount: lines.length }, response: result };
+}

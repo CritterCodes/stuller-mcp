@@ -1,0 +1,156 @@
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+
+import {
+  getProducts,
+  productDetail,
+  pricingAvailability,
+  searchProducts,
+  metalMarketRates,
+  advancedProductFilters,
+} from './tools/products.js';
+import { orderStatus, submitOrder } from './tools/orders.js';
+
+// Wrap a data function so its JSON result becomes MCP tool content and errors
+// surface cleanly instead of crashing the transport.
+function ok(data) {
+  return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+}
+function fail(err) {
+  return { isError: true, content: [{ type: 'text', text: `Error: ${err.message}` }] };
+}
+function tool(fn) {
+  return async (args) => {
+    try {
+      return ok(await fn(args || {}));
+    } catch (err) {
+      return fail(err);
+    }
+  };
+}
+
+export function buildServer() {
+  const server = new McpServer({ name: 'stuller-mcp', version: '0.1.0' });
+
+  // ---- Products: lookup ----
+  server.tool(
+    'get_products',
+    'Fetch one or more Stuller products by SKU/item number (e.g. "309:77802:S", "SOLDER:0267:P"). Returns a normalized product per SKU with description, price, metal, availability, and stock, plus a `notFound` list. Lean by default; pass `include` (Stuller ProductInclude values) for extra blocks. Use product_detail for a single item with images/media/specs.',
+    {
+      skus: z.array(z.string()).describe('One or more Stuller SKUs / item numbers'),
+      include: z
+        .array(z.string())
+        .optional()
+        .describe('Optional Stuller ProductInclude values, e.g. ["All"], ["Prices"], ["Media"]'),
+    },
+    tool((a) => getProducts(a))
+  );
+
+  server.tool(
+    'product_detail',
+    'Full detail for a single Stuller SKU: description, pricing, metal/quality, dimensions, images, media, and all descriptive specifications. Defaults to Include=["All"]; override with `include` if needed.',
+    {
+      sku: z.string().describe('Stuller SKU / item number'),
+      include: z.array(z.string()).optional().describe('Override the default Include (["All"])'),
+    },
+    tool((a) => productDetail(a))
+  );
+
+  server.tool(
+    'pricing_availability',
+    'Real-time price + stock/availability for a batch of SKUs. Lean projection: price, showcase price, currency, on-hand quantity, orderable flag, status, and lead time. Best for "what does X cost / is it in stock" questions.',
+    {
+      skus: z.array(z.string()).describe('One or more Stuller SKUs / item numbers'),
+    },
+    tool((a) => pricingAvailability(a))
+  );
+
+  // ---- Products: search ----
+  server.tool(
+    'advanced_product_filters',
+    'Discover the faceted filters available for search_products: returns facet types (ProductType, MetalQuality, StoneFamily, StoneShape, StoneColor, StoneQuality, StoneUniqueness, StoneCut, StoneSize) and each one\'s valid { displayValue, value } options. Call this FIRST when you don\'t already know exact filter values, then feed a chosen type+value into search_products `advancedProductFilters`. Optionally scope by categoryIds/series/filter to get values for just that slice of the catalog. No arguments returns the full global facet set.',
+    {
+      categoryIds: z.array(z.number().int()).optional().describe('Scope facets to these Stuller category IDs'),
+      series: z.array(z.string()).optional().describe('Scope facets to these series numbers'),
+      filter: z.array(z.string()).optional().describe('ProductFilter flags: None, Orderable, InStock, OnPriceList, Finished, BestSeller'),
+      advancedProductFilters: z
+        .array(z.record(z.any()))
+        .optional()
+        .describe('Already-chosen facets, to get the remaining valid values given those selections'),
+    },
+    tool((a) => advancedProductFilters(a))
+  );
+
+  server.tool(
+    'search_products',
+    'Filter the Stuller catalog and page through results. This is a STRUCTURAL filter, not free-text keyword search: narrow by `series` (e.g. ["309"]), `categoryIds`, `productIds`, `filter` flags, or `advancedProductFilters`. If you don\'t already know valid facet values, call advanced_product_filters FIRST to discover them. Search results carry limited pricing — re-check chosen SKUs with pricing_availability/product_detail before quoting. Returns transformed products plus a `nextPage` token — pass it back as `nextPage` to fetch the next page (hasMore tells you when to stop).',
+    {
+      series: z.array(z.string()).optional().describe('Series numbers, e.g. ["309", "1601"]'),
+      categoryIds: z.array(z.number().int()).optional().describe('Stuller category IDs'),
+      productIds: z.array(z.number().int()).optional().describe('Stuller product IDs'),
+      filter: z
+        .array(z.string())
+        .optional()
+        .describe('ProductFilter flags: None, Orderable, InStock, OnPriceList, Finished, BestSeller'),
+      advancedProductFilters: z
+        .array(z.record(z.any()))
+        .optional()
+        .describe('Advanced filter objects: { Type, Values: [{ DisplayValue, Value }] }'),
+      include: z.array(z.string()).optional().describe('Optional ProductInclude values'),
+      pageSize: z.number().int().positive().optional().describe('Results per page (max 500)'),
+      page: z.number().int().positive().optional().describe('Page number (alternative to nextPage)'),
+      nextPage: z.string().optional().describe('Paging token returned by a prior call'),
+    },
+    tool((a) => searchProducts(a))
+  );
+
+  server.tool(
+    'metal_market_rates',
+    'Current Stuller metal market rates (gold, platinum, silver, etc.). No arguments. Useful for pricing metal-dependent jewelry work.',
+    {},
+    tool(() => metalMarketRates())
+  );
+
+  // ---- Orders ----
+  server.tool(
+    'order_status',
+    'Read Stuller order history / status. With no arguments returns recent orders; narrow with `orderNumber` or a `since`/`until` date range. Read-only.',
+    {
+      orderNumber: z.string().optional(),
+      since: z.string().optional().describe('ISO date, e.g. 2026-05-01'),
+      until: z.string().optional().describe('ISO date'),
+    },
+    tool((a) => orderStatus(a))
+  );
+
+  server.tool(
+    'submit_order',
+    'Submit an order to Stuller. WRITE TOOL — defaults to a DRY RUN: assembles and returns the exact request body WITHOUT transmitting. Review it, then call again with confirm: true to actually place the order. Each line needs a SKU/itemNumber and quantity. Set STULLER_DISABLE_ORDERING=true in the environment to hard-disable this tool. Provide shipping/billing/contact/payment per Stuller\'s submitorder schema; unmodeled fields pass through verbatim.',
+    {
+      lines: z
+        .array(
+          z.object({
+            sku: z.string().optional(),
+            itemNumber: z.string().optional(),
+            quantity: z.number().int().positive().optional(),
+            comments: z.string().optional(),
+          })
+        )
+        .describe('Order line items — each needs sku/itemNumber and quantity'),
+      shipToAddress: z.record(z.any()).optional(),
+      billToAddress: z.record(z.any()).optional(),
+      contact: z.record(z.any()).optional(),
+      payment: z.record(z.any()).optional(),
+      customerData: z.record(z.any()).optional(),
+      purchaseOrderNumber: z.string().optional(),
+      comments: z.string().optional(),
+      confirm: z.boolean().optional().describe('Set true to actually submit. Omit/false = dry-run preview.'),
+    },
+    tool((a) => {
+      const { confirm, ...spec } = a;
+      return submitOrder(spec, confirm === true);
+    })
+  );
+
+  return server;
+}

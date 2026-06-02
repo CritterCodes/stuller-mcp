@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.CritterCodes/stuller-mcp",
+  "description": "MCP server for the Stuller jewelry-supply v2 API: product search, real-time pricing & availability, product detail/media, and gated ordering.",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/CritterCodes/stuller-mcp",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "stuller-mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "STULLER_USERNAME",
+          "description": "Stuller developer-login username (a developer login authorizes API calls only; it is not your stuller.com website login).",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "STULLER_PASSWORD",
+          "description": "Stuller developer-login password.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "STULLER_API_URL",
+          "description": "Override the API base URL. Defaults to https://api.stuller.com.",
+          "isRequired": false
+        },
+        {
+          "name": "STULLER_DISABLE_ORDERING",
+          "description": "Set to 'true' to hard-disable the submit_order write tool regardless of the confirm flag.",
+          "isRequired": false
+        }
+      ]
+    }
+  ]
+}
