@@ -97,6 +97,26 @@ test('resolveProductFacets maps NL queries and disambiguates white-gold vs white
   assert.ok(c.unmatchedTerms.includes('engraving'), 'unmapped terms are reported');
 });
 
+test('stoneDimensions falls back to length when width is 0 (round stones)', async () => {
+  const { stoneDimensions } = await import('../src/tools/gems.js');
+  // Round gemstone: Width reported as 0 → should mirror length.
+  assert.deepEqual(stoneDimensions({ dimensions: { length: 5.0, width: 0 } }, 'gemstone'), {
+    length: 5.0,
+    width: 5.0,
+  });
+  // Diamond with explicit L×W.
+  assert.deepEqual(stoneDimensions({ length: 6.1, width: 4.0 }, 'diamond'), { length: 6.1, width: 4.0 });
+  // Diamond falling back to parsed measurements.
+  assert.deepEqual(stoneDimensions({ measurements: '4.10 x 4.12 x 2.51' }, 'diamond'), {
+    length: 4.1,
+    width: 4.12,
+  });
+  // Diamond round via mmSize only.
+  assert.deepEqual(stoneDimensions({ mmSize: 4.1 }, 'diamond'), { length: 4.1, width: 4.1 });
+  // No usable dimensions.
+  assert.equal(stoneDimensions({}, 'gemstone'), null);
+});
+
 test('the server advertises instructions at connect', async () => {
   const { buildServer } = await import('../src/server.js');
   const server = buildServer();

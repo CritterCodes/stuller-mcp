@@ -113,6 +113,7 @@ Point `command`/`args` at your checkout — useful for development:
 | `search_diamonds` | read | Search natural diamonds by the 4Cs (carat/color/clarity/cut), shape, certification, and price range. |
 | `search_lab_grown_diamonds` | read | Same as `search_diamonds`, against lab-grown inventory. |
 | `search_gemstones` | read | Search colored gemstones (sapphire, ruby, emerald, …) by type, color, shape, and size. |
+| `find_stones_by_dimensions` | read | Find a stone to **fit a setting of a given size** (e.g. replace a lost 4.1mm round), ranked by closeness of fit. |
 | `order_status` | read | Read order history / status (by order number or date range). |
 | `submit_order` | **write** | Place an order. Dry-run by default; only transmits with `confirm: true`. |
 
@@ -137,6 +138,8 @@ Loose stones use a different, richer search than the product catalog. `search_di
 ```
 
 Filter values are plain codes/words (`color: "G"`, `clarity: "VS1"`, `shape: "Round"`). Results include each stone's specs, price, **certificate number**, and images, with `nextPage` paging and a `totalAvailable` count. `search_gemstones` works the same way for colored stones via `stoneTypes` (e.g. `["Sapphire"]`), `colors`, `shapes`, and mm dimensions.
+
+**Replacing a lost stone?** `find_stones_by_dimensions` takes a target size (`lengthMm`, optional `widthMm`, `shape`) and returns the closest-fitting stones ranked by deviation, each with a `fit` block (measured size + mm deviation). Pick `source`: `diamond` (default), `lab_grown_diamond`, or `gemstone` (+`stoneType`). _Note: Stuller has no working server-side fit-by-dimensions endpoint, so this scans by shape and ranks locally — widen `tolerance` if nothing fits._
 
 ### `include` options
 

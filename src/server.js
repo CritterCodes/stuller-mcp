@@ -10,7 +10,12 @@ import {
   advancedProductFilters,
   findProducts,
 } from './tools/products.js';
-import { searchDiamonds, searchLabGrownDiamonds, searchGemstones } from './tools/gems.js';
+import {
+  searchDiamonds,
+  searchLabGrownDiamonds,
+  searchGemstones,
+  findStonesByDimensions,
+} from './tools/gems.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
 import { SERVER_INSTRUCTIONS, USAGE_GUIDE } from './help.js';
 
@@ -197,6 +202,27 @@ export function buildServer() {
       nextPage: z.string().optional(),
     },
     tool((a) => searchGemstones(a))
+  );
+
+  server.tool(
+    'find_stones_by_dimensions',
+    'Find a loose stone to FIT a setting of a given size — e.g. to replace a lost or broken stone. Give the target `lengthMm` (and `widthMm` for non-round shapes; round defaults width=length) plus `shape`, and it scans the stone family and returns the closest-fitting stones ranked by deviation (each match includes a `fit` block with measured size + deviationMm). `source` is "diamond" (default), "lab_grown_diamond", or "gemstone" (set `stoneType`, e.g. "Sapphire"). Widen `tolerance` (mm, default 0.3) if nothing fits.',
+    {
+      lengthMm: z.number().positive().describe('Target stone length / diameter in mm'),
+      widthMm: z.number().positive().optional().describe('Target width in mm (defaults to length for round)'),
+      shape: z.string().optional().describe('Stone shape, e.g. "Round", "Oval", "Princess"'),
+      tolerance: z.number().positive().optional().describe('Max mm deviation per dimension (default 0.3)'),
+      source: z
+        .enum(['diamond', 'lab_grown_diamond', 'gemstone'])
+        .optional()
+        .describe('Which inventory to search (default "diamond")'),
+      stoneType: z.string().optional().describe('For source "gemstone": e.g. "Sapphire", "Ruby"'),
+      color: z.array(z.string()).optional().describe('Diamond color grades to constrain the scan'),
+      clarity: z.array(z.string()).optional().describe('Diamond clarity grades to constrain the scan'),
+      maxResults: z.number().int().positive().optional().describe('Max matches to return (default 10)'),
+      maxScan: z.number().int().positive().optional().describe('Max stones to scan before stopping (default 300)'),
+    },
+    tool((a) => findStonesByDimensions(a))
   );
 
   // ---- Orders ----

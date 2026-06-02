@@ -74,6 +74,12 @@ function transformDiamond(d = {}) {
     showcasePrice: money(d.ShowcasePrice),
     currency: currencyOf(d.Price, d.PricePerCarat, d.ShowcasePrice),
     measurements: d.Measurements ?? null,
+    length: d.Length ?? null,
+    width: d.Width ?? null,
+    height: d.Height ?? null,
+    mmSize: d.MMSize ?? null,
+    minDiameter: d.MinDiameter ?? null,
+    maxDiameter: d.MaxDiameter ?? null,
     depthPercent: d.DepthPercent ?? null,
     table: d.Table ?? null,
     lengthToWidthRatio: d.LengthToWidthRatio ?? null,
@@ -190,5 +196,137 @@ export async function searchGemstones(opts = {}) {
     nextPage,
     hasMore: Boolean(nextPage),
     gemstones: items.map(transformGemstone),
+  };
+}
+
+// ---- fit-by-dimensions matcher (client-side) ----
+// Stuller's bestfitstonesbydimensions endpoint is unreliable (500s) and the
+// gemstone Length/Width filters match exactly (useless for fitting a setting),
+// so we scan a stone family by shape and rank locally by how close each stone's
+// measured size is to the target.
+
+// Parse "L x W x H" measurement strings like "4.10 x 4.12 x 2.51".
+function parseMeasurements(str) {
+  if (typeof str !== 'string') return null;
+  const nums = str.match(/[\d.]+/g);
+  if (!nums || nums.length < 2) return null;
+  return { length: Number(nums[0]), width: Number(nums[1]) };
+}
+
+// Derive a (length, width) in mm for a transformed stone, trying the most
+// reliable source first. Round stones report only Length (Width comes back 0),
+// so a missing/zero width falls back to length. Returns null if no usable size.
+// Exported for unit testing.
+export function stoneDimensions(stone, source) {
+  let length = 0;
+  let width = 0;
+
+  if (source === 'gemstone') {
+    const dd = stone.dimensions || {};
+    length = Number(dd.length) || 0;
+    width = Number(dd.width) || 0;
+  } else if (stone.length) {
+    length = Number(stone.length) || 0;
+    width = Number(stone.width) || 0;
+  } else {
+    const parsed = parseMeasurements(stone.measurements);
+    if (parsed) {
+      length = parsed.length;
+      width = parsed.width;
+    } else {
+      const round = Number(stone.mmSize || stone.maxDiameter || stone.minDiameter) || 0;
+      length = round;
+      width = round;
+    }
+  }
+
+  if (!length) return null;
+  if (!(width > 0)) width = length; // round/symmetric stone, or width not reported
+  return { length, width };
+}
+
+/**
+ * Find loose stones that fit a target setting size, ranked by closeness.
+ * Scans the chosen stone family by shape, then filters to a mm tolerance window
+ * around the target and sorts by total deviation. Use this to source a
+ * replacement for a lost/broken stone.
+ *
+ * @param {{ shape: string, lengthMm: number, widthMm?: number, tolerance?: number,
+ *   source?: 'diamond'|'lab_grown_diamond'|'gemstone', stoneType?: string,
+ *   color?: string[], clarity?: string[], maxResults?: number, maxScan?: number }} opts
+ */
+export async function findStonesByDimensions(opts = {}) {
+  const {
+    shape,
+    lengthMm,
+    widthMm,
+    tolerance = 0.3,
+    source = 'diamond',
+    stoneType,
+    color,
+    clarity,
+    maxResults = 10,
+    maxScan = 300,
+  } = opts;
+
+  if (!lengthMm) throw new Error('`lengthMm` (the target stone length in mm) is required.');
+  const targetL = Number(lengthMm);
+  const targetW = widthMm != null ? Number(widthMm) : targetL; // round: width == length
+
+  // Scan candidates page by page (capped).
+  const candidates = [];
+  let nextPage;
+  let scanned = 0;
+  let pages = 0;
+  const pageSize = 100;
+  do {
+    let res;
+    if (source === 'gemstone') {
+      res = await searchGemstones({
+        shapes: shape ? [shape] : undefined,
+        stoneTypes: stoneType ? [stoneType] : undefined,
+        pageSize,
+        nextPage,
+      });
+      for (const s of res.gemstones) candidates.push(s);
+    } else {
+      const path = source === 'lab_grown_diamond' ? LAB_GROWN_PATH : DIAMONDS_PATH;
+      res = await diamondSearch(path, { shape: shape ? [shape] : undefined, color, clarity, pageSize, nextPage });
+      for (const s of res.diamonds) candidates.push(s);
+    }
+    scanned += res[source === 'gemstone' ? 'gemstones' : 'diamonds'].length;
+    nextPage = res.nextPage;
+    pages += 1;
+  } while (nextPage && scanned < maxScan && pages < 10);
+
+  const matches = candidates
+    .map((stone) => {
+      const dims = stoneDimensions(stone, source);
+      if (!dims) return null;
+      const dL = Math.abs(dims.length - targetL);
+      const dW = Math.abs(dims.width - targetW);
+      return { stone, lengthMm: dims.length, widthMm: dims.width, dL, dW, deviationMm: dL + dW };
+    })
+    .filter((c) => c && c.dL <= tolerance && c.dW <= tolerance)
+    .sort((a, b) => a.deviationMm - b.deviationMm)
+    .slice(0, maxResults)
+    .map((c) => ({
+      ...c.stone,
+      fit: {
+        lengthMm: c.lengthMm,
+        widthMm: c.widthMm,
+        deviationMm: Number(c.deviationMm.toFixed(3)),
+      },
+    }));
+
+  return {
+    target: { shape: shape ?? null, lengthMm: targetL, widthMm: targetW, toleranceMm: tolerance },
+    source,
+    scanned,
+    capped: Boolean(nextPage && scanned >= maxScan),
+    count: matches.length,
+    matches,
+    note:
+      'Stones scanned by shape and ranked locally by fit (Stuller has no working server-side fit-by-dimensions search). Widen `tolerance` or raise `maxScan` if nothing fits.',
   };
 }
