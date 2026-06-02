@@ -1,4 +1,5 @@
 import { stullerRequest } from '../stuller/client.js';
+import { withCache } from '../stuller/cache.js';
 import { normalizeProductsResponse, transformProduct, summarizePricing } from '../stuller/transform.js';
 
 const PRODUCTS_PATH = '/v2/products';
@@ -15,7 +16,7 @@ const DETAIL_INCLUDE = ['All'];
  * @param {{ skus: string[], include?: string[] }} opts
  */
 export async function getProducts({ skus, include } = {}) {
-  const list = (Array.isArray(skus) ? skus : [skus]).filter(Boolean);
+  const list = [...new Set((Array.isArray(skus) ? skus : [skus]).filter(Boolean).map((s) => String(s).trim()).filter(Boolean))];
   if (!list.length) throw new Error('Provide at least one SKU in `skus`.');
 
   const body = { SKU: list };
@@ -101,10 +102,9 @@ export async function searchProducts(opts = {}) {
   };
 }
 
-/** Current Stuller metal market rates (gold/platinum/silver). No arguments. */
+/** Current Stuller metal market rates (gold/platinum/silver). No arguments. Cached (slow-changing). */
 export async function metalMarketRates() {
-  const payload = await stullerRequest('GET', METAL_RATES_PATH);
-  return payload;
+  return withCache('metal-market-rates', () => stullerRequest('GET', METAL_RATES_PATH));
 }
 
 /**
@@ -126,7 +126,11 @@ export async function advancedProductFilters(opts = {}) {
   if (opts.filter?.length) body.Filter = opts.filter;
   if (opts.advancedProductFilters?.length) body.AdvancedProductFilters = opts.advancedProductFilters;
 
-  const payload = await stullerRequest('POST', ADVANCED_FILTERS_PATH, { body });
+  // Facet vocabulary is slow-changing and called repeatedly (find_products,
+  // discover_categories) — cache by the scoping body.
+  const payload = await withCache(`apf:${JSON.stringify(body)}`, () =>
+    stullerRequest('POST', ADVANCED_FILTERS_PATH, { body })
+  );
   // Live responses nest the list under `AdvancedProductFilter` (singular);
   // accept the other casings defensively.
   const raw =

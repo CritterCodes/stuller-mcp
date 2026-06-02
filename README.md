@@ -164,6 +164,37 @@ Read tools accept an optional `include` array of Stuller **ProductInclude** valu
 
 ---
 
+## Worked example: source a stone + price a mounting
+
+A custom-design flow chaining several tools (real shapes, abbreviated):
+
+```jsonc
+// 1. Find a 1–1.5ct round GIA diamond under $6k
+search_diamonds({ caratMin:1, caratMax:1.5, shape:["Round"], certification:["GIA"], priceMax:6000 })
+// → { count: …, diamonds: [{ serialNumber, caratWeight:1.0, color:"G", clarity:"VS1",
+//      price:5100, certificationNumber:"1408618343", … }] }
+
+// 2. Find a semi-mount it can be set into
+search_virtual_products({ filter:["Orderable"], pageSize:5 })
+// → { products: [{ baseProductId:22145800, settingOptions:[{shape:"Marquise", sizeMM:7,…}],
+//      canBeSetWith:[{shape:"MARQUISE", size:"7.00"}], fullySetImages:[…] }] }
+
+// 3. Price the mounting configured to size 7
+configure_product({ productId:22145800, ringSize:7 })
+// → { totalPrice:715.10, currency:"USD", estimatedShipDate:…, images:[…10] }
+
+// 4. Build a quote (Stuller part + your labor) and convert to an order
+quote_add_item({ sku:"SOLDER:0267:P", quantity:2 })   // live-priced
+quote_add_item({ description:"Setting labor", unitPrice:120 })
+quote_view()              // → running subtotal
+quote_to_order()          // → { lines:[{sku,quantity}], excluded:[{labor}] }
+submit_order({ lines:[…] })   // DRY RUN — review, then confirm:true to place
+```
+
+For finished jewelry that faceted search can't express (e.g. "diamond stud earrings"),
+use `discover_categories({ productType:"Earrings", contains:"stud" })` → pick a
+`categoryId` → `search_products({ categoryIds:[id] })`.
+
 ## Safety model
 
 - **Reads** (everything except `submit_order` — products, stones, configuration, `order_status`, `list_invoices`, `get_shipment`, …) never modify anything.

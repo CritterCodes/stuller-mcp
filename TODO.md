@@ -56,8 +56,8 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 - [x] **Catalog-browse gap** — `discover_categories` tool (WebCategories→CategoryIds) + `webCategories` on every product result.
 - [x] **Code-quality** — shared `src/stuller/util.js` (money/currencyOf/extractImages/extractCategories/isoDate); removed duplicated helpers from gems/configurable/invoices/transform; unified image shape.
-- [ ] **Response cache** — short-TTL memoization of hot reads.
-- [ ] **I/O polish & DX** — consistent envelopes, error messages, worked README example.
+- [x] **Response cache** — `src/stuller/cache.js` TTL cache (STULLER_CACHE_TTL_MS, default 10min); caches facet vocabulary + metal market rates only. Pricing/inventory deliberately uncached. Verified 584ms→1ms on repeat.
+- [x] **I/O polish & DX** — documented tuning env vars in .env.example (timeout/retries/cache); SKU input trimmed + de-duped; worked end-to-end example added to README.
 
 ## Project hardening / distribution
 
