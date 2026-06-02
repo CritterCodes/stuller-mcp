@@ -7,6 +7,27 @@ import {
   transformGemstone,
   buildDiamondRequest,
 } from '../src/tools/gems.js';
+import { sizedImageUrl } from '../src/stuller/util.js';
+
+// ---- sizedImageUrl (Stuller CDN size tokens) ----
+
+const DAS = 'https://meteor.stullercloud.com/das/95540927';
+
+test('sizedImageUrl: swaps an existing size token', () => {
+  assert.equal(sizedImageUrl(`${DAS}?$standard$`, 'xlarge'), `${DAS}?$xlarge$`);
+  assert.equal(sizedImageUrl(`${DAS}?$thumb$`, 'zoom'), `${DAS}?$zoom$`);
+});
+test('sizedImageUrl: adds a token when none present', () => {
+  assert.equal(sizedImageUrl(DAS, 'thumb'), `${DAS}?$thumb$`);
+});
+test('sizedImageUrl: original strips the token', () => {
+  assert.equal(sizedImageUrl(`${DAS}?$standard$`, 'original'), DAS);
+});
+test('sizedImageUrl: unknown size or non-Stuller URL is left untouched', () => {
+  assert.equal(sizedImageUrl(`${DAS}?$standard$`, 'bogus'), `${DAS}?$standard$`);
+  assert.equal(sizedImageUrl('https://example.com/pic.jpg', 'thumb'), 'https://example.com/pic.jpg');
+  assert.equal(sizedImageUrl('', 'thumb'), '');
+});
 
 // ---- buildDiamondRequest (range + facet mapping) ----
 

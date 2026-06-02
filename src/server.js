@@ -169,6 +169,10 @@ export function buildServer() {
     {
       sku: z.string().optional().describe('Stuller SKU; uses its primary image'),
       imageUrl: z.string().optional().describe('Explicit image URL (e.g. a display.primaryImage or fullySetImages URL)'),
+      size: z
+        .enum(['tiny', 'thumb', 'list', 'standard', 'xlarge', 'zoom', 'original'])
+        .optional()
+        .describe('Render size: tiny 40px · thumb 75px · list 165px · standard 300px · xlarge 640px · zoom 1500px · original. Bigger = larger inline image (use xlarge/zoom for a TV).'),
     },
     async (a) => {
       try {

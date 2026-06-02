@@ -46,6 +46,34 @@ export function isoDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
+// Stuller image CDN (meteor.stullercloud.com/das/...) renders a size via a query
+// token. These are the empirically-confirmed tokens (unrecognized tokens and
+// explicit WxH are ignored and serve the original). `original` = no token.
+export const IMAGE_SIZES = {
+  tiny: '$tiny$', // 40px
+  thumb: '$thumb$', // 75px
+  list: '$list$', // 165px
+  standard: '$standard$', // 300px
+  xlarge: '$xlarge$', // 640px
+  zoom: '$zoom$', // 1500px
+  original: null,
+};
+
+/**
+ * Return a Stuller image URL re-sized to a named tier (see IMAGE_SIZES). Leaves
+ * non-Stuller URLs and unknown size names untouched.
+ * @param {string} url
+ * @param {keyof typeof IMAGE_SIZES} size
+ */
+export function sizedImageUrl(url, size) {
+  if (!url || !size) return url;
+  if (!/stullercloud\.com\/das\//.test(url)) return url; // only the DAS CDN uses tokens
+  if (!(size in IMAGE_SIZES)) return url;
+  const base = url.replace(/\?\$[^$]*\$$/, ''); // drop any existing size token
+  const token = IMAGE_SIZES[size];
+  return token ? `${base}?${token}` : base;
+}
+
 /**
  * Render-ready summary for any buyable result, so a UI/voice/TV surface can
  * display "what you're buying" with zero parsing.

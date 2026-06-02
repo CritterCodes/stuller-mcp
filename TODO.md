@@ -48,7 +48,8 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 - [x] **`display` block** on every buyable result ({ title, price, currency, primaryImage, thumbnail, video }) — render-ready for any UI/voice/TV surface. Configurable mounts prefer the fully-set image; diamonds/gemstones get a composed title.
 - [x] **`show_product` tool** — fetches a product image and returns an MCP image content block (inline render / "show this" payload). URLs stay default; base64 is opt-in, single-item, size-guarded.
-- [ ] Future: sized image variants (Stuller CDN size tokens) once confirmed; push-to-screen integration for the parked voice assistant.
+- [x] **Sized image variants** — confirmed Stuller CDN size tokens empirically (tiny 40 / thumb 75 / list 165 / standard 300 / xlarge 640 / zoom 1500; unknown tokens + WxH ignored → original). `sizedImageUrl()` helper + `show_product` `size` option. Verified live.
+- [ ] Future: push-to-screen integration for the parked voice assistant.
 
 ## Parked ideas
 

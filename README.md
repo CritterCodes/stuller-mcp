@@ -175,6 +175,16 @@ display: { title, price, currency, primaryImage, thumbnail, video }
 
 `primaryImage`/`thumbnail` are CDN URLs (configurable mounts prefer the *fully-set* finished look). For lightweight/bulk rendering, surfaces should use these URLs directly. To render a single image **inline in chat** (or push it to a screen), call **`show_product`** — it downloads the image and returns an MCP image content block. URLs stay the default; inlining (base64) is opt-in and single-item.
 
+**Image sizes.** Stuller's image CDN renders a size via a query token, so any surface can resize by swapping it (the `?$…$` at the end of a `meteor.stullercloud.com/das/…` URL):
+
+| token | px | | token | px |
+|---|---|---|---|---|
+| `$tiny$` | 40 | | `$standard$` | 300 |
+| `$thumb$` | 75 | | `$xlarge$` | 640 |
+| `$list$` | 165 | | `$zoom$` | 1500 |
+
+No token = the original. (Unrecognized tokens and explicit `WxH` are ignored.) `show_product` takes a `size` option (`tiny`…`zoom`/`original`) — use `xlarge`/`zoom` for a TV, `tiny`/`thumb` for a watch or list.
+
 ## Worked example: source a stone + price a mounting
 
 A custom-design flow chaining several tools (real shapes, abbreviated):

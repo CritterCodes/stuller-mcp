@@ -1,4 +1,5 @@
 import { productDetail } from './products.js';
+import { sizedImageUrl, IMAGE_SIZES } from '../stuller/util.js';
 
 const FETCH_TIMEOUT_MS = 15000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // guard against pulling something huge
@@ -8,11 +9,16 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // guard against pulling something huge
  * server can hand back an MCP image content block (renders inline in MCP clients
  * and gives a voice/TV surface a "show this" payload).
  *
- * Pass a `sku` (its primary image is used) or an explicit `imageUrl`.
- * @param {{ sku?: string, imageUrl?: string }} opts
- * @returns {{ sku, sourceUrl, mimeType, base64, bytes, title, price, currency }}
+ * Pass a `sku` (its primary image is used) or an explicit `imageUrl`. Optional
+ * `size` (tiny|thumb|list|standard|xlarge|zoom|original) re-renders via the CDN.
+ * @param {{ sku?: string, imageUrl?: string, size?: string }} opts
+ * @returns {{ sku, sourceUrl, mimeType, base64, bytes, title, price, currency, size }}
  */
-export async function showProduct({ sku, imageUrl } = {}) {
+export async function showProduct({ sku, imageUrl, size } = {}) {
+  if (size && !(size in IMAGE_SIZES)) {
+    throw new Error(`Unknown size "${size}". Use one of: ${Object.keys(IMAGE_SIZES).join(', ')}.`);
+  }
+
   let url = imageUrl;
   let title = null;
   let price = null;
@@ -27,6 +33,8 @@ export async function showProduct({ sku, imageUrl } = {}) {
     currency = product.display?.currency || 'USD';
     if (!url) throw new Error(`No image available for ${sku}.`);
   }
+
+  if (size) url = sizedImageUrl(url, size);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -48,5 +56,5 @@ export async function showProduct({ sku, imageUrl } = {}) {
     throw new Error(`Image is ${(buf.length / 1e6).toFixed(1)}MB — too large to inline. Use the URL instead: ${url}`);
   }
 
-  return { sku: sku ?? null, sourceUrl: url, mimeType, base64: buf.toString('base64'), bytes: buf.length, title, price, currency };
+  return { sku: sku ?? null, sourceUrl: url, mimeType, base64: buf.toString('base64'), bytes: buf.length, title, price, currency, size: size ?? null };
 }
