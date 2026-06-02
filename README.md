@@ -106,6 +106,7 @@ Point `command`/`args` at your checkout — useful for development:
 | `get_products` | read | Fetch one or more products by SKU. Returns normalized product data + a `notFound` list. |
 | `product_detail` | read | Full detail for a single SKU including images, media, and all specifications. |
 | `pricing_availability` | read | Lean real-time price + stock/availability for a batch of SKUs. |
+| `find_products` | read | **Natural-language search** — give a plain phrase ("white gold diamond stud earrings") and it resolves the terms to real facets, then searches. Easiest entry point. |
 | `advanced_product_filters` | read | Discover the facets you can search on (ProductType, MetalQuality, StoneFamily, …) and their valid values. |
 | `search_products` | read | Filter the catalog by series / category / advanced filters, with `nextPage` paging. |
 | `metal_market_rates` | read | Current Stuller gold/platinum/silver market rates. |
@@ -117,7 +118,9 @@ Point `command`/`args` at your checkout — useful for development:
 
 ### How searching works
 
-Stuller's product endpoint filters **structurally** — there is no free-text keyword search. You find products by identifier (`SKU`, `productIds`, `series`, `categoryIds`) or by **faceted filters**. The faceted flow is two steps:
+Stuller's product endpoint filters **structurally** — there is no free-text keyword search. The easiest path is **`find_products`**, which takes a plain phrase, resolves it against the live facet vocabulary, and reports back what it understood (`resolvedFilters`) and any words it couldn't map (`unmatchedTerms`). Under the hood it uses the same facets you can drive yourself:
+
+You find products by identifier (`SKU`, `productIds`, `series`, `categoryIds`) or by **faceted filters**. The faceted flow is two steps:
 
 1. **`advanced_product_filters`** — discover the available facets and their valid values. There are 9 facet types: `ProductType`, `MetalQuality`, `StoneShape`, `StoneFamily`, `StoneColor`, `StoneQuality`, `StoneUniqueness`, `StoneCut`, `StoneSize`.
 2. **`search_products`** — pass a chosen facet back in as `advancedProductFilters: [{ Type, Values: [{ DisplayValue, Value }] }]`, optionally combined with `filter` flags (`InStock`, `Orderable`, `OnPriceList`, `Finished`, `BestSeller`). So *"diamond stud earrings"* becomes `ProductType=Earrings` + `StoneFamily=Diamond`.

@@ -67,6 +67,36 @@ test('the MCP server builds and registers tools without credentials', async () =
   assert.ok(server, 'buildServer() should return a server');
 });
 
+test('resolveProductFacets maps NL queries and disambiguates white-gold vs white-stone', async () => {
+  const { resolveProductFacets } = await import('../src/tools/products.js');
+  const facets = [
+    { type: 'ProductType', values: [{ displayValue: 'Earrings', value: 'Earrings' }, { displayValue: 'Rings', value: 'Rings' }, { displayValue: 'Bracelets', value: 'Bracelets' }] },
+    { type: 'MetalQuality', values: [{ displayValue: '10K White Gold', value: '10K White Gold' }, { displayValue: '14K White Gold', value: '14K White Gold' }, { displayValue: 'Sterling Silver', value: 'Sterling Silver' }] },
+    { type: 'StoneFamily', values: [{ displayValue: 'Diamond', value: 'Diamond' }, { displayValue: 'Sapphire', value: 'Sapphire' }] },
+    { type: 'StoneColor', values: [{ displayValue: 'White', value: 'White' }, { displayValue: 'G', value: 'G' }, { displayValue: 'D', value: 'D' }] },
+  ];
+
+  const a = resolveProductFacets('white gold diamond stud earrings', facets);
+  const types = Object.fromEntries(a.resolved.map((r) => [r.type, r.values.map((v) => v.displayValue)]));
+  assert.deepEqual(types.MetalQuality, ['10K White Gold', '14K White Gold'], 'both white-gold karats');
+  assert.deepEqual(types.ProductType, ['Earrings'], '"earrings" must not match "Rings"');
+  assert.deepEqual(types.StoneFamily, ['Diamond']);
+  assert.ok(!types.StoneColor, '"white" is consumed by the metal, not StoneColor');
+  assert.ok(!('G' in (types.StoneColor || [])), 'short grade codes never substring-match');
+
+  // Without "gold", "white" is correctly read as a stone color.
+  const b = resolveProductFacets('white diamond', facets);
+  const bt = Object.fromEntries(b.resolved.map((r) => [r.type, r.values.map((v) => v.displayValue)]));
+  assert.deepEqual(bt.StoneColor, ['White']);
+  assert.deepEqual(bt.StoneFamily, ['Diamond']);
+  assert.ok(!bt.MetalQuality, 'no metal without a metal word');
+
+  // Filter detection + unmatched reporting.
+  const c = resolveProductFacets('sterling silver bracelet in stock with engraving', facets);
+  assert.deepEqual(c.detectedFilters, ['InStock']);
+  assert.ok(c.unmatchedTerms.includes('engraving'), 'unmapped terms are reported');
+});
+
 test('the server advertises instructions at connect', async () => {
   const { buildServer } = await import('../src/server.js');
   const server = buildServer();

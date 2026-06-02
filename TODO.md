@@ -34,7 +34,7 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 ## Feature roadmap (ranked by adoption impact)
 
 1. [x] **Diamond & gem search** — ✅ shipped. `search_diamonds`, `search_lab_grown_diamonds`, `search_gemstones` wrap `/v2/gem/*`; 4Cs + shape + certification + price/carat ranges, paging, cert numbers & images. Verified live.
-2. **Natural-language search resolver** — a single `find_products("diamond stud earrings, white gold")` tool that resolves facets internally (discover → map terms → `search_products`). Fixes the "no free-text keyword search" gap so non-expert agents can use it.
+2. [x] **Natural-language search resolver** — ✅ shipped. `find_products` resolves a plain phrase against the live facet vocabulary (word-boundary matching + longest-span-wins consumption so "white gold" beats stone-color "White"), returns `resolvedFilters` + `unmatchedTerms`, then runs the search. Pure resolver unit-tested; verified live.
 3. **Stone matching by dimensions** — `/v2/products/bestfitstonesbydimensions`, `/v2/products/searchstones`, `/searchstonesbystonegroup`. "Find a stone to replace a lost 4.1mm round." High value for repair & custom.
 4. **Configurable & virtual products** — `/v2/products/configureproduct`, `/configuredproduct`, `/v2/products/virtual`. Configurable mountings (metal/size/head) + semi-set pieces built for API resale. Unlocks custom design *and* dropship catalogs.
 5. **Order fulfillment loop** — `/v2/invoice`, `/v2/invoice/shipment`. Order status + tracking numbers, so `submit_order` isn't a dead end (place *and* track).
@@ -56,6 +56,10 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 - Core read tools: `get_products`, `product_detail`, `pricing_availability`, `search_products`, `advanced_product_filters`, `metal_market_rates`.
 - `order_status` (read) + `submit_order` (write, dry-run gated, kill-switch env).
+- Diamond & gemstone search (`search_diamonds`, `search_lab_grown_diamonds`, `search_gemstones`).
+- Natural-language product search (`find_products`) with facet resolution + unmatched-term reporting.
+- In-chat docs: server `instructions` (sent at connect) + `get_started` tool (markdown walkthrough), sourced from `src/help.js`.
 - Env-based HTTP Basic auth, `.env.example`, `.gitignore`, smoke script (graceful without creds).
 - All read paths verified against the live Stuller catalog.
-- README + this roadmap.
+- Public GitHub repo pushed, CI green (Node 18/20/22, checkout/setup-node v5).
+- README + CONTRIBUTING + server.json + this roadmap.

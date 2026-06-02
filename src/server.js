@@ -8,6 +8,7 @@ import {
   searchProducts,
   metalMarketRates,
   advancedProductFilters,
+  findProducts,
 } from './tools/products.js';
 import { searchDiamonds, searchLabGrownDiamonds, searchGemstones } from './tools/gems.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
@@ -81,6 +82,22 @@ export function buildServer() {
   );
 
   // ---- Products: search ----
+  server.tool(
+    'find_products',
+    'Natural-language product search. Give a plain phrase like "white gold diamond stud earrings" or "sterling silver bracelet in stock" and it resolves the terms against Stuller\'s live facet vocabulary (so you don\'t need to know exact values), then runs the search. Returns `resolvedFilters` (how it interpreted the query), `appliedFilters`, and `unmatchedTerms` (words it could not map — refine or use advanced_product_filters for those). Best starting point for catalog discovery; use search_products directly when you already know exact facet values. Re-check pricing on chosen SKUs before quoting.',
+    {
+      query: z.string().describe('Plain-language description, e.g. "yellow gold rope chain"'),
+      filter: z
+        .array(z.string())
+        .optional()
+        .describe('Extra ProductFilter flags (InStock/Orderable/OnPriceList/Finished/BestSeller); in-stock/best-seller phrasing in the query is auto-detected'),
+      pageSize: z.number().int().positive().optional(),
+      page: z.number().int().positive().optional(),
+      nextPage: z.string().optional().describe('Paging token from a prior call'),
+    },
+    tool((a) => findProducts(a))
+  );
+
   server.tool(
     'advanced_product_filters',
     'Discover the faceted filters available for search_products: returns facet types (ProductType, MetalQuality, StoneFamily, StoneShape, StoneColor, StoneQuality, StoneUniqueness, StoneCut, StoneSize) and each one\'s valid { displayValue, value } options. Call this FIRST when you don\'t already know exact filter values, then feed a chosen type+value into search_products `advancedProductFilters`. Optionally scope by categoryIds/series/filter to get values for just that slice of the catalog. No arguments returns the full global facet set.',
