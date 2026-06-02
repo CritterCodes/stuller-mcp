@@ -11,6 +11,7 @@ import {
 } from './tools/products.js';
 import { searchDiamonds, searchLabGrownDiamonds, searchGemstones } from './tools/gems.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
+import { SERVER_INSTRUCTIONS, USAGE_GUIDE } from './help.js';
 
 // Wrap a data function so its JSON result becomes MCP tool content and errors
 // surface cleanly instead of crashing the transport.
@@ -31,7 +32,20 @@ function tool(fn) {
 }
 
 export function buildServer() {
-  const server = new McpServer({ name: 'stuller-mcp', version: '0.1.0' });
+  const server = new McpServer(
+    { name: 'stuller-mcp', version: '0.1.0' },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
+
+  // ---- Help / onboarding ----
+  // Returns the full usage walkthrough on demand, so even clients that ignore
+  // server `instructions` let a user ask "how do I use this?" in chat.
+  server.tool(
+    'get_started',
+    'Return a markdown guide to this Stuller server: how to find products (no free-text search — use identifiers or faceted filters), check pricing, search loose diamonds/gemstones by the 4Cs, and place orders safely. Call this when the user asks how to use the server or what it can do.',
+    {},
+    async () => ({ content: [{ type: 'text', text: USAGE_GUIDE }] })
+  );
 
   // ---- Products: lookup ----
   server.tool(

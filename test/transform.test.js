@@ -66,3 +66,19 @@ test('the MCP server builds and registers tools without credentials', async () =
   const server = buildServer();
   assert.ok(server, 'buildServer() should return a server');
 });
+
+test('the server advertises instructions at connect', async () => {
+  const { buildServer } = await import('../src/server.js');
+  const server = buildServer();
+  // McpServer wraps the low-level Server, which stores instructions for the
+  // initialize result. Guard that ours is actually wired through.
+  assert.ok(server.server._instructions, 'server instructions should be set');
+});
+
+test('the usage guide covers the core concepts', async () => {
+  const { SERVER_INSTRUCTIONS, USAGE_GUIDE } = await import('../src/help.js');
+  assert.ok(SERVER_INSTRUCTIONS.length > 200, 'instructions should be substantive');
+  for (const concept of ['search_diamonds', 'advanced_product_filters', 'dry run', 'pricing']) {
+    assert.ok(USAGE_GUIDE.includes(concept), `guide should mention "${concept}"`);
+  }
+});

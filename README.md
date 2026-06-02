@@ -98,8 +98,11 @@ Point `command`/`args` at your checkout — useful for development:
 
 ## Tools
 
+> **New to it?** Just ask the assistant *"how do I use the Stuller server?"* — the `get_started` tool returns a full walkthrough in chat, and the server also sends usage instructions to your client automatically on connect.
+
 | Tool | Type | What it does |
 |------|------|--------------|
+| `get_started` | read | Returns a markdown usage guide (finding products, pricing, stone search, ordering). Ask the assistant how to use the server. |
 | `get_products` | read | Fetch one or more products by SKU. Returns normalized product data + a `notFound` list. |
 | `product_detail` | read | Full detail for a single SKU including images, media, and all specifications. |
 | `pricing_availability` | read | Lean real-time price + stock/availability for a batch of SKUs. |
