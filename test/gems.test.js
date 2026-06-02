@@ -48,6 +48,12 @@ test('sizedImageUrl: adds a token when none present', () => {
 test('sizedImageUrl: original strips the token', () => {
   assert.equal(sizedImageUrl(`${DAS}?$standard$`, 'original'), DAS);
 });
+test('sizedImageUrl: strips an &-attached token (no double token)', () => {
+  // Regression: a URL with the token attached via & must not get a second token.
+  assert.equal(sizedImageUrl(`${DAS}?x=1&$standard$`, 'xlarge'), `${DAS}?x=1&$xlarge$`);
+  assert.equal(sizedImageUrl(`${DAS}&$standard$`, 'xlarge'), `${DAS}?$xlarge$`);
+});
+
 test('sizedImageUrl: unknown size or non-Stuller URL is left untouched', () => {
   assert.equal(sizedImageUrl(`${DAS}?$standard$`, 'bogus'), `${DAS}?$standard$`);
   assert.equal(sizedImageUrl('https://example.com/pic.jpg', 'thumb'), 'https://example.com/pic.jpg');

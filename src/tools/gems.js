@@ -220,16 +220,36 @@ export async function searchLabGrownDiamonds(opts = {}) {
   return diamondSearch(LAB_GROWN_PATH, opts);
 }
 
+// Common gemstone color words → Stuller's record color codes (e.g. "Bl" for blue).
+const GEM_COLOR_CODES = {
+  blue: 'bl', green: 'gr', red: 'rd', pink: 'pk', yellow: 'yl', purple: 'pu',
+  orange: 'or', brown: 'br', black: 'bk', white: 'wh', violet: 'vi', teal: 'tl', gray: 'gy', grey: 'gy',
+};
+function gemColorMatches(stone, wanted) {
+  const code = String(stone.color || '').toLowerCase();
+  const desc = String(stone.description || stone.title || '').toLowerCase();
+  return wanted.some((w) => {
+    const lw = String(w).toLowerCase().trim();
+    if (!lw) return false;
+    return desc.includes(lw) || code === lw || code === GEM_COLOR_CODES[lw] || (lw.length >= 3 && code.startsWith(lw.slice(0, 2)));
+  });
+}
+
 /**
  * Search colored gemstones (sapphire, ruby, emerald, etc.).
+ *
+ * Stuller's server-side `Colors` filter is broken (rejects record codes, ignores
+ * words), so when `colors` is given we scan by stoneType/shape and filter the
+ * results CLIENT-SIDE against each stone's color code / description.
  * @param {{ stoneTypes?:string[], colors?:string[], shapes?:string[], length?:number,
  *   width?:number, serialNumbers?:number[], filters?:{Option:string,Value:string}[],
- *   pageSize?, page?, nextPage? }} opts
+ *   pageSize?, page?, nextPage?, full?:boolean }} opts
  */
 export async function searchGemstones(opts = {}) {
+  if (opts.colors?.length) return gemstonesByColor(opts);
+
   const body = {};
   if (opts.stoneTypes?.length) body.StoneTypes = opts.stoneTypes;
-  if (opts.colors?.length) body.Colors = opts.colors;
   if (opts.shapes?.length) body.Shapes = opts.shapes;
   if (opts.length != null) body.Length = Number(opts.length);
   if (opts.width != null) body.Width = Number(opts.width);
@@ -248,6 +268,40 @@ export async function searchGemstones(opts = {}) {
     nextPage,
     hasMore: Boolean(nextPage),
     gemstones: opts.full ? stones : stones.map(gemstoneCard),
+  };
+}
+
+// Client-side color filter: scan pages (the API color filter doesn't work) and
+// keep stones whose color/description matches the requested color(s).
+async function gemstonesByColor(opts) {
+  const want = opts.colors;
+  const limit = opts.pageSize || 10;
+  const maxScan = 250;
+  const matched = [];
+  let nextPage;
+  let scanned = 0;
+  let pages = 0;
+  do {
+    const res = await searchGemstones({
+      ...opts,
+      colors: undefined, // don't send the broken server filter
+      full: true,
+      pageSize: 100,
+      nextPage,
+    });
+    for (const s of res.gemstones) if (gemColorMatches(s, want)) matched.push(s);
+    scanned += res.gemstones.length;
+    nextPage = res.nextPage;
+    pages += 1;
+  } while (nextPage && scanned < maxScan && pages < 5 && matched.length < limit);
+
+  const out = matched.slice(0, limit);
+  return {
+    count: out.length,
+    scanned,
+    colorFilter: 'client-side (Stuller\'s color filter is non-functional)',
+    hasMore: Boolean(nextPage),
+    gemstones: opts.full ? out : out.map(gemstoneCard),
   };
 }
 

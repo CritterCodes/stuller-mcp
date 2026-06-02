@@ -61,9 +61,9 @@ function transformVirtual(p = {}) {
       settingType: c.SettingType,
     })),
     // SetWith often repeats the same placeholder stone SKU dozens of times — dedupe.
-    setWith: dedupeBy(p.SetWith || [], (s) => s.SKU ?? s.sku ?? JSON.stringify(s)),
-    images: productImages,
-    fullySetImages,
+    setWith: dedupeBy(p.SetWith || [], (s) => s.SKU ?? s.sku ?? JSON.stringify(s)).slice(0, 5),
+    images: productImages.slice(0, 3),
+    fullySetImages: fullySetImages.slice(0, 3),
     // Prefer the finished (set) look for display when available.
     display: buildDisplay({
       title: p.ShortDescription ?? base.Description ?? null,
@@ -92,7 +92,7 @@ export async function searchVirtualProducts(opts = {}) {
   if (opts.filter?.length) body.Filter = opts.filter;
   if (opts.advancedProductFilters?.length) body.AdvancedProductFilters = opts.advancedProductFilters;
   body.Include = opts.include?.length ? opts.include : DEFAULT_INCLUDE;
-  body.PageSize = opts.pageSize || 10; // virtual products are heavy — default a small page
+  body.PageSize = opts.pageSize || 3; // virtual products are heavy (config model) — default a tiny page
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 

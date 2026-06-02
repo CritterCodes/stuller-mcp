@@ -62,6 +62,14 @@ From a full live QA sweep:
 - [x] **list_invoices ignored the date window** — Stuller's invoice endpoint ignores ALL date params (returns full 2023→2026 history). Now filtered CLIENT-SIDE by invoiceDate; verified (May 2026 → 5 invoices, was 119).
 - [x] **Stone searches overflowed** — search_diamonds/lab_grown/gemstones now return LEAN cards + default pageSize 10 (150K–327K → ~3.7K); `full:true` opt; find_stones_by_dimensions scans full internally + returns lean cards + fit.
 
+## 3rd-sweep fixes (2026-06-02)
+
+- [x] **Gemstone color filter** — Stuller's server `Colors` filter is non-functional (code `Bl`→400, word `Blue`→0). Now filtered CLIENT-SIDE: scan by stoneType/shape, match record color code/description (GEM_COLOR_CODES map + description substring). "Blue oval sapphire" → 3 results.
+- [x] **find_products low-confidence warning** — when no ProductType resolves but terms are unmatched (e.g. "rope chains"), sets `lowConfidence:true` + a note instead of silently returning metal-only/unrelated products.
+- [x] **search_virtual_products too large** — default pageSize 3 (was 10) + cap images/fullySetImages to 3 and setWith to 5 → ~12K (was 115K).
+- [x] **show_product double size-token** — sizedImageUrl now strips an existing `?`/`&`-attached token before appending (regression-tested).
+- Note: a Stuller gemstone record reported width 511mm (their bad data); surfaced as-is.
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.

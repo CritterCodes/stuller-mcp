@@ -507,7 +507,19 @@ export async function findProducts({ query, filter, pageSize, page, nextPage, fu
     unmatchedTerms,
     ...results,
   };
-  if (setAside.length) {
+
+  // Low-confidence guard: if no ProductType was resolved AND query words went
+  // unmatched (e.g. "rope chains" — no chain-style vocabulary), the results are
+  // filtered by metal/other facets only and likely DON'T match what was asked.
+  // Warn loudly rather than returning unrelated products silently.
+  // (hasProductType was computed earlier from `resolved`.)
+  if (!hasProductType && unmatchedTerms.length) {
+    out.lowConfidence = true;
+    out.note =
+      `No product type matched the query — unmatched term(s): ${unmatchedTerms.join(', ')}. ` +
+      'Results are filtered only by what DID match (e.g. metal) and may not be the item type you want. ' +
+      'Use advanced_product_filters (facetType:"ProductType") to find the right type, or discover_categories to browse a merchandising category.';
+  } else if (setAside.length) {
     out.notApplied = fmt(setAside);
     out.note =
       "Stone facets (e.g. StoneFamily) describe loose stones and can't be combined with a finished-jewelry ProductType in Stuller's catalog, so they were not applied. Results are filtered by product type/metal only. To reach a finished-jewelry category like 'diamond stud earrings', call discover_categories (e.g. productType:'Earrings', contains:'stud') and search_products by the returned categoryIds; for loose stones use search_diamonds/search_gemstones.";

@@ -69,9 +69,12 @@ export function sizedImageUrl(url, size) {
   if (!url || !size) return url;
   if (!/stullercloud\.com\/das\//.test(url)) return url; // only the DAS CDN uses tokens
   if (!(size in IMAGE_SIZES)) return url;
-  const base = url.replace(/\?\$[^$]*\$$/, ''); // drop any existing size token
+  // Strip any existing trailing size token, whether attached with ? or & (Stuller
+  // image URLs carry the token AS the query, e.g. ".../das/123?$standard$").
+  const base = url.replace(/[?&]\$[^$]*\$\s*$/, '');
   const token = IMAGE_SIZES[size];
-  return token ? `${base}?${token}` : base;
+  if (!token) return base; // original
+  return base.includes('?') ? `${base}&${token}` : `${base}?${token}`;
 }
 
 /**

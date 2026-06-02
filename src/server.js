@@ -235,10 +235,10 @@ export function buildServer() {
 
   server.tool(
     'search_gemstones',
-    'Search Stuller\'s colored gemstone inventory (sapphire, ruby, emerald, etc.). Filter by `stoneTypes` (e.g. ["Sapphire"]) — the most reliable filter — plus `shapes` and `length`/`width` in mm. NOTE: Stuller\'s `colors` filter is unreliable (it rejects the record color codes and matches nothing for plain words like "Blue"), and the gemstone endpoint sometimes returns an empty first page despite a non-zero total — page with `nextPage` to pull results. To match a size for a setting, prefer find_stones_by_dimensions. Returns type, color, carat, price, dimensions, certification, images.',
+    'Search Stuller\'s colored gemstone inventory (sapphire, ruby, emerald, etc.). Filter by `stoneTypes` (e.g. ["Sapphire"]), `shapes`, `length`/`width` in mm, and `colors` (plain words like "Blue" — applied CLIENT-SIDE by scanning, since Stuller\'s own color filter is broken; results return a `colorFilter` note). To match a size for a setting, prefer find_stones_by_dimensions. Returns lean cards by default (full:true for complete objects). No server-side carat range — use find_stones_by_dimensions or filter results.',
     {
-      stoneTypes: z.array(z.string()).optional().describe('Gem types, e.g. ["Sapphire","Ruby","Emerald"] — the reliable filter'),
-      colors: z.array(z.string()).optional().describe('Unreliable on Stuller\'s side; prefer filtering by stoneType then reviewing the color field'),
+      stoneTypes: z.array(z.string()).optional().describe('Gem types, e.g. ["Sapphire","Ruby","Emerald"]'),
+      colors: z.array(z.string()).optional().describe('Plain color words, e.g. ["Blue"] — filtered client-side (Stuller\'s server filter is non-functional)'),
       shapes: z.array(z.string()).optional().describe('e.g. ["Round","Oval","Cushion"]'),
       length: z.number().positive().optional().describe('Length in mm'),
       width: z.number().positive().optional().describe('Width in mm'),
