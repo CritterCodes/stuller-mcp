@@ -16,6 +16,7 @@ import {
   searchGemstones,
   findStonesByDimensions,
 } from './tools/gems.js';
+import { searchVirtualProducts, configureProduct, getConfiguredProduct } from './tools/configurable.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
 import { SERVER_INSTRUCTIONS, USAGE_GUIDE } from './help.js';
 
@@ -223,6 +224,74 @@ export function buildServer() {
       maxScan: z.number().int().positive().optional().describe('Max stones to scan before stopping (default 300)'),
     },
     tool((a) => findStonesByDimensions(a))
+  );
+
+  // ---- Configurable / virtual products ----
+  server.tool(
+    'search_virtual_products',
+    'Search configurable / semi-set ("virtual") mountings — pieces you set stones into. Each result includes its configuration model (ring sizes, setting locations with shape/size/setting-type) and `canBeSetWith` (compatible stone specs), plus `fullySetImages` and the `baseProductId` you pass to configure_product. Ideal for custom-design sourcing and dropship catalogs. Requires at least one selector (series/sku/productIds/categoryIds/filter); `filter: ["Orderable"]` is a good broad start.',
+    {
+      series: z.array(z.string()).optional(),
+      sku: z.array(z.string()).optional(),
+      productIds: z.array(z.number().int()).optional(),
+      categoryIds: z.array(z.number().int()).optional(),
+      filter: z.array(z.string()).optional().describe('ProductFilter flags, e.g. ["Orderable","InStock"]'),
+      advancedProductFilters: z.array(z.record(z.any())).optional(),
+      include: z.array(z.string()).optional().describe('ProductInclude values (defaults to ["All"] for full config model)'),
+      pageSize: z.number().int().positive().optional(),
+      page: z.number().int().positive().optional(),
+      nextPage: z.string().optional(),
+    },
+    tool((a) => searchVirtualProducts(a))
+  );
+
+  server.tool(
+    'configure_product',
+    'Configure a mounting and get its live total price, estimated ship date, and imagery for the chosen options. Pass the BASE product id (a virtual product\'s `baseProductId`, or a configurable product\'s Id) plus selections: `ringSize`, `stones` (set a stone at a location), `engravings`, `chainLength`, earring-back/clasp ids. Read-only price quote — does NOT place an order (use submit_order for that).',
+    {
+      productId: z.number().int().describe('Base product id of the configurable mounting'),
+      quantity: z.number().int().positive().optional(),
+      ringSize: z.number().optional(),
+      chainLength: z.number().optional(),
+      earringBackProductId: z.number().int().optional(),
+      claspProductId: z.number().int().optional(),
+      pendantChainProductId: z.number().int().optional(),
+      stones: z
+        .array(
+          z.object({
+            locationNumber: z.number().int(),
+            stoneProductId: z.number().int().optional(),
+            serialNumber: z.number().int().optional(),
+            customerStoneValue: z.number().optional(),
+          })
+        )
+        .optional()
+        .describe('Stone selections per setting location'),
+      engravings: z
+        .array(
+          z.object({
+            locationNumber: z.number().int(),
+            type: z.string().optional(),
+            font: z.string().optional(),
+            fillColor: z.string().optional(),
+            finish: z.string().optional(),
+            text: z.string().optional(),
+          })
+        )
+        .optional(),
+      include: z.array(z.string()).optional(),
+    },
+    tool((a) => configureProduct(a))
+  );
+
+  server.tool(
+    'get_configured_product',
+    'Retrieve a previously configured item by its configuration id (e.g. one returned from configure_product as `configurationId`). Returns SKU, pricing, availability, ship date, and the configured selections.',
+    {
+      configurationId: z.number().int().describe('The configuration id of an existing configured product'),
+      include: z.array(z.string()).optional(),
+    },
+    tool((a) => getConfiguredProduct(a))
   );
 
   // ---- Orders ----

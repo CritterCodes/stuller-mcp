@@ -114,6 +114,9 @@ Point `command`/`args` at your checkout — useful for development:
 | `search_lab_grown_diamonds` | read | Same as `search_diamonds`, against lab-grown inventory. |
 | `search_gemstones` | read | Search colored gemstones (sapphire, ruby, emerald, …) by type, color, shape, and size. |
 | `find_stones_by_dimensions` | read | Find a stone to **fit a setting of a given size** (e.g. replace a lost 4.1mm round), ranked by closeness of fit. |
+| `search_virtual_products` | read | Search configurable / semi-set mountings; returns setting locations, ring sizes, compatible stones, and `baseProductId`. |
+| `configure_product` | read | Price a configured mounting (ring size, stones, engraving) — live total + ship date + imagery. Quote only; does not order. |
+| `get_configured_product` | read | Retrieve a previously configured item by its configuration id. |
 | `order_status` | read | Read order history / status (by order number or date range). |
 | `submit_order` | **write** | Place an order. Dry-run by default; only transmits with `confirm: true`. |
 
@@ -140,6 +143,12 @@ Loose stones use a different, richer search than the product catalog. `search_di
 Filter values are plain codes/words (`color: "G"`, `clarity: "VS1"`, `shape: "Round"`). Results include each stone's specs, price, **certificate number**, and images, with `nextPage` paging and a `totalAvailable` count. `search_gemstones` works the same way for colored stones via `stoneTypes` (e.g. `["Sapphire"]`), `colors`, `shapes`, and mm dimensions.
 
 **Replacing a lost stone?** `find_stones_by_dimensions` takes a target size (`lengthMm`, optional `widthMm`, `shape`) and returns the closest-fitting stones ranked by deviation, each with a `fit` block (measured size + mm deviation). Pick `source`: `diamond` (default), `lab_grown_diamond`, or `gemstone` (+`stoneType`). _Note: Stuller has no working server-side fit-by-dimensions endpoint, so this scans by shape and ranks locally — widen `tolerance` if nothing fits._
+
+### Configurable & semi-mount products
+
+`search_virtual_products` finds configurable mountings (semi-sets you set stones into). Each result exposes its `configurationModel` (ring sizes, setting locations with shape/size/setting-type), `canBeSetWith` (compatible stone specs), `fullySetImages`, and a `baseProductId`.
+
+Feed that `baseProductId` into `configure_product` with your choices (`ringSize`, `stones` at locations, `engravings`, chain length, …) to get a **live total price, estimated ship date, and configured imagery**. This is a quote — it doesn't place an order (use `submit_order` for that). A typical custom flow: `search_virtual_products` → pick a mount → `find_stones_by_dimensions`/`search_diamonds` for the stone → `configure_product` to price it → `submit_order`.
 
 ### `include` options
 

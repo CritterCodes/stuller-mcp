@@ -117,6 +117,28 @@ test('stoneDimensions falls back to length when width is 0 (round stones)', asyn
   assert.equal(stoneDimensions({}, 'gemstone'), null);
 });
 
+test('transformVirtual surfaces baseProductId and the configuration model', async () => {
+  const { transformVirtual } = await import('../src/tools/configurable.js');
+  const v = transformVirtual({
+    SKU: 'CONFIG.123',
+    Price: { Value: 985.8, CurrencyCode: 'USD' },
+    BaseProduct: { Id: 22145800, SKU: 'BASE:1' },
+    ConfigurationModel: {
+      Id: 966053,
+      IsPegHeadable: true,
+      SettingOptions: [{ LocationNumber: 1, Shape: 'Marquise', SizeMM: 7, Dimension1: 7, Dimension2: 3.5, SettingType: 'Prong' }],
+    },
+    CanBeSetWith: [{ Quantity: 1, Shape: 'MARQUISE', Size: '7.00', SettingType: 'PR' }],
+  });
+  // The gotcha: configure_product needs BaseProduct.Id, NOT ConfigurationModel.Id.
+  assert.equal(v.baseProductId, 22145800);
+  assert.equal(v.configurationModelId, 966053);
+  assert.equal(v.price, 985.8);
+  assert.equal(v.settingOptions[0].shape, 'Marquise');
+  assert.equal(v.settingOptions[0].dimensions.d2, 3.5);
+  assert.equal(v.canBeSetWith[0].size, '7.00');
+});
+
 test('the server advertises instructions at connect', async () => {
   const { buildServer } = await import('../src/server.js');
   const server = buildServer();
