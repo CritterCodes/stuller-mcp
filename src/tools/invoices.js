@@ -1,16 +1,8 @@
 import { stullerRequest } from '../stuller/client.js';
+import { money, isoDate } from '../stuller/util.js';
 
 const INVOICE_PATH = '/v2/invoice';
 const SHIPMENT_PATH = '/v2/invoice/shipment';
-
-function money(m) {
-  if (m == null) return null;
-  return typeof m === 'number' ? m : m.Value ?? null;
-}
-
-function isoDate(d) {
-  return d.toISOString().slice(0, 10);
-}
 
 function transformInvoice(inv = {}) {
   const lineItems = (inv.InvoiceDetails || []).map((l) => ({

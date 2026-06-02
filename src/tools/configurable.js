@@ -1,4 +1,5 @@
 import { stullerRequest } from '../stuller/client.js';
+import { money, currencyOf, extractImages as images } from '../stuller/util.js';
 
 const VIRTUAL_PATH = '/v2/products/virtual';
 const CONFIGURE_PATH = '/v2/products/configureproduct';
@@ -7,21 +8,6 @@ const CONFIGURED_PATH = '/v2/products/configuredproduct';
 // Virtual products are configurable semi-mounts; their full configuration model
 // (ring sizes, setting locations, compatible stones) only populates with includes.
 const DEFAULT_INCLUDE = ['All'];
-
-function money(m) {
-  if (m == null) return null;
-  return typeof m === 'number' ? m : m.Value ?? null;
-}
-function currencyOf(...candidates) {
-  for (const c of candidates) if (c && typeof c === 'object' && c.CurrencyCode) return c.CurrencyCode;
-  return 'USD';
-}
-function images(raw = []) {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((i) => (typeof i === 'string' ? { full: i } : { full: i.FullUrl || i.Url || null, thumbnail: i.ThumbnailUrl || null }))
-    .filter((i) => i.full || i.thumbnail);
-}
 
 function transformVirtual(p = {}) {
   const cm = p.ConfigurationModel || {};

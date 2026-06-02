@@ -9,6 +9,7 @@ import {
   metalMarketRates,
   advancedProductFilters,
   findProducts,
+  discoverCategories,
 } from './tools/products.js';
 import {
   searchDiamonds,
@@ -142,6 +143,23 @@ export function buildServer() {
       nextPage: z.string().optional().describe('Paging token returned by a prior call'),
     },
     tool((a) => searchProducts(a))
+  );
+
+  server.tool(
+    'discover_categories',
+    'Find Stuller merchandising categories (and their CategoryIds) for finished-jewelry browse. Stuller has no category-tree endpoint, but products carry WebCategories whose ids are valid CategoryIds. This scans a slice of the catalog (by `productType` e.g. "Earrings"/"Rings", or series/filter/advancedProductFilters) and returns the distinct categories seen — optionally filtered by `contains` (e.g. "stud"). Pick a category `id`, then call search_products with categoryIds:[id]. This is how to reach things faceted search can\'t (e.g. "diamond stud earrings"), since stone facets don\'t combine with finished ProductType.',
+    {
+      productType: z.string().optional().describe('e.g. "Earrings", "Rings", "Bracelets"'),
+      contains: z.string().optional().describe('Keep only categories whose name/path contains this (e.g. "stud", "diamond")'),
+      series: z.array(z.string()).optional(),
+      categoryIds: z.array(z.number().int()).optional(),
+      productIds: z.array(z.number().int()).optional(),
+      filter: z.array(z.string()).optional(),
+      advancedProductFilters: z.array(z.record(z.any())).optional(),
+      scanPages: z.number().int().positive().optional().describe('Pages to scan (default 2, max 10)'),
+      pageSize: z.number().int().positive().optional().describe('Products per page (default 50)'),
+    },
+    tool((a) => discoverCategories(a))
   );
 
   server.tool(

@@ -1,21 +1,9 @@
 import { stullerRequest } from '../stuller/client.js';
+import { money, currencyOf, extractImages } from '../stuller/util.js';
 
 const DIAMONDS_PATH = '/v2/gem/diamonds';
 const LAB_GROWN_PATH = '/v2/gem/labgrowndiamonds';
 const GEMSTONES_PATH = '/v2/gem/gemstones';
-
-// Stuller money fields come back as { Value, CurrencyCode } (sometimes a bare number).
-function money(m) {
-  if (m == null) return null;
-  if (typeof m === 'number') return m;
-  return m.Value ?? null;
-}
-function currencyOf(...candidates) {
-  for (const c of candidates) {
-    if (c && typeof c === 'object' && c.CurrencyCode) return c.CurrencyCode;
-  }
-  return 'USD';
-}
 
 // Build the shared DiamondRequest body from friendly options. Exported for tests.
 export function buildDiamondRequest(opts = {}) {
@@ -47,17 +35,6 @@ export function buildDiamondRequest(opts = {}) {
   return body;
 }
 
-function normalizeImages(raw = []) {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((img) =>
-      typeof img === 'string'
-        ? { full: img }
-        : { full: img.FullUrl || img.Url || null, thumbnail: img.ThumbnailUrl || null }
-    )
-    .filter((i) => i.full || i.thumbnail);
-}
-
 export function transformDiamond(d = {}) {
   return {
     serialNumber: d.SerialNumber ?? null,
@@ -87,7 +64,7 @@ export function transformDiamond(d = {}) {
     certificationNumber: d.CertificationNumber ?? null,
     certificatePath: d.CertificatePath ?? null,
     countryOfOrigin: d.CountryOfOrigin ?? null,
-    images: normalizeImages(d.Images),
+    images: extractImages(d.Images),
     videos: d.Videos ?? [],
   };
 }
@@ -116,7 +93,7 @@ export function transformGemstone(g = {}) {
     certification: g.Certification ?? null,
     certificationNumber: g.CertificationNumber ?? null,
     description: g.Description ?? null,
-    images: normalizeImages(g.Images),
+    images: extractImages(g.Images),
     videos: g.Videos ?? [],
   };
 }

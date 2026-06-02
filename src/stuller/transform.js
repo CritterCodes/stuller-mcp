@@ -3,6 +3,8 @@
 // and handles the many casings/aliases Stuller returns across endpoints; it is
 // extended here to surface images/media and to handle the list+paging envelope.
 
+import { extractImages, extractCategories } from './util.js';
+
 // ---- response envelope ----
 // POST /v2/products returns { Products: [...], NextPage: "token"|null }.
 // GET /v2/products?SKU= returns a single object or { Products: [...] }.
@@ -57,22 +59,6 @@ function buildSpecifications(productData = {}, descriptiveElements = []) {
 }
 
 // Stuller image entries vary in shape; pull out the most useful URLs.
-function normalizeImages(productData = {}) {
-  const raw = productData.Images || productData.images || [];
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((img) => {
-      if (typeof img === 'string') return { full: img };
-      return {
-        full: img.FullUrl || img.Url || img.fullUrl || img.url || null,
-        thumbnail: img.ThumbnailUrl || img.thumbnailUrl || null,
-        zoom: img.ZoomUrl || img.zoomUrl || null,
-        caption: img.Caption || img.caption || null,
-      };
-    })
-    .filter((i) => i.full || i.thumbnail || i.zoom);
-}
-
 function normalizeMedia(productData = {}) {
   const raw = productData.Media || productData.media || productData.Videos || [];
   if (!Array.isArray(raw)) return [];
@@ -122,8 +108,11 @@ export function transformProduct(productData = {}, itemNumber = '') {
       series: getDescriptiveElement(descriptiveElements, 'Series')?.displayValue || '',
     },
     dimensions: buildDimensions(descriptiveElements),
-    images: normalizeImages(productData),
+    images: extractImages(productData.Images || productData.images || []),
     media: normalizeMedia(productData),
+    // WebCategories carry { id, name, path }; the ids are valid CategoryIds you
+    // can drill into via search_products / discover_categories.
+    webCategories: extractCategories(productData.WebCategories || productData.webCategories || []),
     specifications: buildSpecifications(productData, descriptiveElements),
     stock: {
       available:

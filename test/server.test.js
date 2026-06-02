@@ -10,6 +10,7 @@ const EXPECTED_TOOLS = [
   'find_products',
   'advanced_product_filters',
   'search_products',
+  'discover_categories',
   'metal_market_rates',
   'search_diamonds',
   'search_lab_grown_diamonds',

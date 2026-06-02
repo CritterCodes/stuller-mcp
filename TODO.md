@@ -44,9 +44,20 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 ---
 
+## Parked ideas
+
+- **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.
+
 ## Known limitations / future
 
-- **Finished-jewelry discovery by description is weak.** Stuller models `StoneFamily/Color/Shape/...` as *loose-stone* facets that don't AND with finished-goods `ProductType` (e.g. Earrings + Diamond → 0). `find_products` now sets stone facets aside and reports it, but real "diamond stud earrings" browse needs the **merchandising CategoryId tree**, which has no discovery endpoint in the wrapped API surface. Future: a category-browse tool (map names→CategoryIds) for proper finished-jewelry navigation. Loose-stone search (`search_diamonds`/`search_gemstones`) and by-SKU/series browse work well today.
+- ~~Finished-jewelry discovery by description is weak.~~ **Addressed** by `discover_categories`: products carry `WebCategories` whose ids are valid CategoryIds, so the tool harvests them from a scan (by productType/series/filter, optional `contains`) → pick a CategoryId → `search_products`. `find_products` points here when stone facets get set aside. (Stuller still has no category-tree endpoint; this scans-and-aggregates, so coverage depends on how many products you scan.)
+
+## Refinement pass (in progress)
+
+- [x] **Catalog-browse gap** — `discover_categories` tool (WebCategories→CategoryIds) + `webCategories` on every product result.
+- [x] **Code-quality** — shared `src/stuller/util.js` (money/currencyOf/extractImages/extractCategories/isoDate); removed duplicated helpers from gems/configurable/invoices/transform; unified image shape.
+- [ ] **Response cache** — short-TTL memoization of hot reads.
+- [ ] **I/O polish & DX** — consistent envelopes, error messages, worked README example.
 
 ## Project hardening / distribution
 

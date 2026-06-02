@@ -82,6 +82,24 @@ test('transformProduct: images normalize from strings and objects', () => {
   assert.deepEqual(transformProduct({ Images: 'oops' }).images, []);
 });
 
+test('transformProduct: WebCategories → webCategories { id, name, path }', () => {
+  const p = transformProduct({
+    WebCategories: [
+      { Id: 21344, Name: 'Solitaire Engagement Rings', Path: 'jewelry/rings/engagement' },
+      { Name: 'no id, dropped' },
+    ],
+  });
+  assert.equal(p.webCategories.length, 1);
+  assert.deepEqual(p.webCategories[0], { id: 21344, name: 'Solitaire Engagement Rings', path: 'jewelry/rings/engagement' });
+});
+
+test('transformProduct: image objects now carry zoom + caption (shared extractImages)', () => {
+  const p = transformProduct({ Images: [{ FullUrl: 'a', ZoomUrl: 'z', Caption: 'c' }] });
+  assert.equal(p.images[0].full, 'a');
+  assert.equal(p.images[0].zoom, 'z');
+  assert.equal(p.images[0].caption, 'c');
+});
+
 test('transformProduct: descriptive elements feed metal + specifications', () => {
   const p = transformProduct({
     DescriptiveElementGroup: {

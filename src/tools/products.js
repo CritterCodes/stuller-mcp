@@ -153,6 +153,80 @@ export async function advancedProductFilters(opts = {}) {
   };
 }
 
+/**
+ * Discover merchandising categories (and their CategoryIds) by scanning products.
+ * Stuller exposes no category-tree endpoint, but products carry `WebCategories`
+ * ({ id, name, path }) whose ids ARE valid CategoryIds. This scans a slice of the
+ * catalog and aggregates the distinct categories it sees, so you can find a
+ * CategoryId (e.g. "Diamond Stud Earrings") and then search_products by it —
+ * which is how finished-jewelry browse actually works.
+ *
+ * @param {{ productType?:string, series?:string[], categoryIds?:number[], productIds?:number[],
+ *   filter?:string[], advancedProductFilters?:object[], contains?:string,
+ *   scanPages?:number, pageSize?:number }} opts
+ */
+export async function discoverCategories(opts = {}) {
+  const contains = opts.contains ? String(opts.contains).toLowerCase() : null;
+  const scanPages = Math.max(1, Math.min(opts.scanPages || 2, 10));
+  const pageSize = opts.pageSize || 50;
+
+  const apf = Array.isArray(opts.advancedProductFilters) ? [...opts.advancedProductFilters] : [];
+  if (opts.productType) {
+    const { facets } = await advancedProductFilters({});
+    const ptFacet = facets.find((f) => f.type === 'ProductType');
+    const val = ptFacet?.values.find(
+      (v) => String(v.displayValue).toLowerCase() === String(opts.productType).toLowerCase()
+    );
+    if (!val) {
+      throw new Error(
+        `Unknown productType "${opts.productType}". Call advanced_product_filters for valid ProductType values.`
+      );
+    }
+    apf.push({ Type: 'ProductType', Values: [{ DisplayValue: val.displayValue, Value: val.value }] });
+  }
+
+  const hasSelector =
+    opts.series?.length || opts.categoryIds?.length || opts.productIds?.length || opts.filter?.length || apf.length;
+  if (!hasSelector) {
+    throw new Error('Provide productType, series, categoryIds, productIds, filter, or advancedProductFilters to scan.');
+  }
+
+  const counts = new Map();
+  let nextPage;
+  let scanned = 0;
+  let pages = 0;
+  do {
+    const res = await searchProducts({
+      series: opts.series,
+      categoryIds: opts.categoryIds,
+      productIds: opts.productIds,
+      filter: opts.filter,
+      advancedProductFilters: apf.length ? apf : undefined,
+      pageSize,
+      nextPage,
+    });
+    for (const p of res.products) {
+      for (const c of p.webCategories || []) {
+        if (contains && !`${c.name} ${c.path}`.toLowerCase().includes(contains)) continue;
+        const cur = counts.get(c.id) || { ...c, productHits: 0 };
+        cur.productHits += 1;
+        counts.set(c.id, cur);
+      }
+    }
+    scanned += res.products.length;
+    nextPage = res.nextPage;
+    pages += 1;
+  } while (nextPage && pages < scanPages);
+
+  const categories = [...counts.values()].sort((a, b) => b.productHits - a.productHits);
+  return {
+    scannedProducts: scanned,
+    categoryCount: categories.length,
+    categories,
+    usage: 'Pass a category `id` to search_products as categoryIds:[id] to browse that merchandising category.',
+  };
+}
+
 // ---- natural-language facet resolver (pure; unit-tested without network) ----
 
 // Karat/quality tokens that modify a metal rather than identify it — they don't
@@ -366,7 +440,7 @@ export async function findProducts({ query, filter, pageSize, page, nextPage } =
   if (setAside.length) {
     out.notApplied = fmt(setAside);
     out.note =
-      "Stone facets (e.g. StoneFamily) describe loose stones and can't be combined with a finished-jewelry ProductType in Stuller's catalog, so they were not applied. Results are filtered by product type/metal only; refine with metal or a category/series, or use search_diamonds for loose stones.";
+      "Stone facets (e.g. StoneFamily) describe loose stones and can't be combined with a finished-jewelry ProductType in Stuller's catalog, so they were not applied. Results are filtered by product type/metal only. To reach a finished-jewelry category like 'diamond stud earrings', call discover_categories (e.g. productType:'Earrings', contains:'stud') and search_products by the returned categoryIds; for loose stones use search_diamonds/search_gemstones.";
   }
   return out;
 }

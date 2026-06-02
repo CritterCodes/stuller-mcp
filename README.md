@@ -108,6 +108,7 @@ Point `command`/`args` at your checkout — useful for development:
 | `pricing_availability` | read | Lean real-time price + stock/availability for a batch of SKUs. |
 | `find_products` | read | **Natural-language search** — give a plain phrase ("white gold diamond stud earrings") and it resolves the terms to real facets, then searches. Easiest entry point. |
 | `advanced_product_filters` | read | Discover the facets you can search on (ProductType, MetalQuality, StoneFamily, …) and their valid values. |
+| `discover_categories` | read | Find merchandising categories + their CategoryIds (e.g. "Diamond Stud Earrings") to browse finished jewelry facets can't reach. |
 | `search_products` | read | Filter the catalog by series / category / advanced filters, with `nextPage` paging. |
 | `metal_market_rates` | read | Current Stuller gold/platinum/silver market rates. |
 | `search_diamonds` | read | Search natural diamonds by the 4Cs (carat/color/clarity/cut), shape, certification, and price range. |
