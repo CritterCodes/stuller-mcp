@@ -73,7 +73,9 @@ export async function searchProducts(opts = {}) {
   if (opts.productIds?.length) body.ProductId = opts.productIds;
   if (opts.filter?.length) body.Filter = opts.filter;
   if (opts.advancedProductFilters?.length) body.AdvancedProductFilters = opts.advancedProductFilters;
-  if (opts.include?.length) body.Include = opts.include;
+  // Default to a full include so results carry SKU/price/images; without it the
+  // search endpoint returns sparse records (no price). Callers can override.
+  body.Include = opts.include?.length ? opts.include : ['All'];
   if (opts.pageSize) body.PageSize = opts.pageSize;
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
@@ -299,7 +301,23 @@ export async function findProducts({ query, filter, pageSize, page, nextPage } =
   const { resolved, detectedFilters, unmatchedTerms } = resolveProductFacets(query, facets);
   const appliedFilters = [...new Set([...(filter || []), ...detectedFilters])];
 
-  if (!resolved.length && !appliedFilters.length) {
+  // Stuller models loose-stone facets (StoneFamily/Color/Shape/...) separately
+  // from finished-goods ProductType — ANDing them returns zero. When a
+  // ProductType is present, set the stone facets aside and report them.
+  const LOOSE_STONE_FACETS = new Set([
+    'StoneFamily',
+    'StoneColor',
+    'StoneShape',
+    'StoneQuality',
+    'StoneUniqueness',
+    'StoneCut',
+    'StoneSize',
+  ]);
+  const hasProductType = resolved.some((r) => r.type === 'ProductType');
+  const applied = hasProductType ? resolved.filter((r) => !LOOSE_STONE_FACETS.has(r.type)) : resolved;
+  const setAside = hasProductType ? resolved.filter((r) => LOOSE_STONE_FACETS.has(r.type)) : [];
+
+  if (!applied.length && !appliedFilters.length) {
     return {
       query,
       matched: false,
@@ -313,7 +331,7 @@ export async function findProducts({ query, filter, pageSize, page, nextPage } =
     };
   }
 
-  const advancedFilters = resolved.map((r) => ({
+  const advancedFilters = applied.map((r) => ({
     Type: r.type,
     Values: r.values.map((v) => ({ DisplayValue: v.displayValue, Value: v.value })),
   }));
@@ -326,16 +344,19 @@ export async function findProducts({ query, filter, pageSize, page, nextPage } =
     nextPage,
   });
 
-  return {
+  const fmt = (list) => list.map((r) => ({ type: r.type, values: r.values.map((v) => v.displayValue) }));
+  const out = {
     query,
     matched: true,
-    // human-readable summary of how the query was interpreted
-    resolvedFilters: resolved.map((r) => ({
-      type: r.type,
-      values: r.values.map((v) => v.displayValue),
-    })),
+    resolvedFilters: fmt(applied),
     appliedFilters,
     unmatchedTerms,
     ...results,
   };
+  if (setAside.length) {
+    out.notApplied = fmt(setAside);
+    out.note =
+      "Stone facets (e.g. StoneFamily) describe loose stones and can't be combined with a finished-jewelry ProductType in Stuller's catalog, so they were not applied. Results are filtered by product type/metal only; refine with metal or a category/series, or use search_diamonds for loose stones.";
+  }
+  return out;
 }

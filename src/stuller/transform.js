@@ -12,8 +12,18 @@ export function normalizeProductsResponse(payload = {}) {
     return { products: payload.Products, nextPage: payload.NextPage ?? null };
   if (Array.isArray(payload?.products))
     return { products: payload.products, nextPage: payload.nextPage ?? null };
-  if (payload && typeof payload === 'object') return { products: [payload], nextPage: null };
-  return { products: [], nextPage: null };
+  // A bare single-product object (e.g. GET ?SKU=) — but ONLY if it actually looks
+  // like a product. A zero-result search comes back as a bare envelope
+  // ({ PageSize, TotalNumberOfProducts, MetalMarkets }) with no Products array;
+  // wrapping that as a product produced a phantom empty result.
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    (payload.SKU || payload.ItemNumber || payload.sku || payload.itemNumber || payload.Id)
+  ) {
+    return { products: [payload], nextPage: payload.NextPage ?? null };
+  }
+  return { products: [], nextPage: payload?.NextPage ?? null };
 }
 
 function getDescriptiveElement(elements = [], name) {

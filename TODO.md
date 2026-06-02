@@ -44,6 +44,10 @@ README (setup / security / tool docs), env-based auth, `.gitignore`, dry-run-gat
 
 ---
 
+## Known limitations / future
+
+- **Finished-jewelry discovery by description is weak.** Stuller models `StoneFamily/Color/Shape/...` as *loose-stone* facets that don't AND with finished-goods `ProductType` (e.g. Earrings + Diamond → 0). `find_products` now sets stone facets aside and reports it, but real "diamond stud earrings" browse needs the **merchandising CategoryId tree**, which has no discovery endpoint in the wrapped API surface. Future: a category-browse tool (map names→CategoryIds) for proper finished-jewelry navigation. Loose-stone search (`search_diamonds`/`search_gemstones`) and by-SKU/series browse work well today.
+
 ## Project hardening / distribution
 
 - [ ] **HTTP/SSE transport** alongside stdio, so it can be hosted and used by web clients (big for adoption).
