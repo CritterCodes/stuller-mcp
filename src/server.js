@@ -240,8 +240,8 @@ export function buildServer() {
       stoneTypes: z.array(z.string()).optional().describe('Gem types, e.g. ["Sapphire","Ruby","Emerald"]'),
       colors: z.array(z.string()).optional().describe('Plain color words, e.g. ["Blue"] — filtered client-side (Stuller\'s server filter is non-functional)'),
       shapes: z.array(z.string()).optional().describe('e.g. ["Round","Oval","Cushion"]'),
-      length: z.number().positive().optional().describe('Length in mm'),
-      width: z.number().positive().optional().describe('Width in mm'),
+      length: z.number().positive().optional().describe('Length in mm — EXACT match (not a range); over-constrains and usually returns ~0. For size-matching use find_stones_by_dimensions instead.'),
+      width: z.number().positive().optional().describe('Width in mm — EXACT match; same caveat as length. Prefer find_stones_by_dimensions for fitting a setting.'),
       serialNumbers: z.array(z.number().int()).optional(),
       filters: z
         .array(z.object({ Option: z.string(), Value: z.string() }))

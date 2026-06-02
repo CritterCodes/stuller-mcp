@@ -44,8 +44,8 @@ You need a Stuller **developer login** (API-only credentials, not your stuller.c
 ## Loose stones
 - \`search_diamonds\` / \`search_lab_grown_diamonds\` — filter by the 4Cs (\`caratMin\`/\`caratMax\`, \`color\`, \`clarity\`, \`cut\`), plus \`shape\`, \`certification\`, and \`priceMin\`/\`priceMax\`. Returns specs, price, certificate number, and images.
   - Example: \`{ caratMin: 1.0, caratMax: 1.5, color: ["G"], clarity: ["VS1"], shape: ["Round"], certification: ["GIA"] }\`
-- \`search_gemstones\` — colored stones by \`stoneTypes\` (["Sapphire"]), \`colors\`, \`shapes\`, mm \`length\`/\`width\`.
-- \`find_stones_by_dimensions\` — find a stone to FIT a setting size (e.g. replace a lost 4.1mm round), ranked by closeness of fit.
+- \`search_gemstones\` — colored stones by \`stoneTypes\` (["Sapphire"]), \`colors\` (client-side), \`shapes\`. NOTE: \`length\`/\`width\` are EXACT matches that usually return ~nothing — for sizing a stone to a setting use find_stones_by_dimensions, not search_gemstones.
+- \`find_stones_by_dimensions\` — find a stone to FIT a setting size (e.g. replace a lost 4.1mm round), ranked by closeness of fit. This is the size-matching tool.
 
 Filter values are plain codes/words: color "G", clarity "VS1", shape "Round".
 
