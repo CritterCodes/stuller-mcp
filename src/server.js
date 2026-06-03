@@ -21,6 +21,7 @@ import { searchVirtualProducts, configureProduct, getConfiguredProduct } from '.
 import { showProduct } from './tools/media.js';
 import { listInvoices, getShipment } from './tools/invoices.js';
 import { quoteAdd, quoteRemove, quoteView, quoteClear, quoteToOrder } from './tools/quote.js';
+import { favoriteAdd, favoriteList, favoriteRemove, favoritesToQuote } from './tools/favorites.js';
 import { orderStatus, submitOrder } from './tools/orders.js';
 import { SERVER_INSTRUCTIONS, USAGE_GUIDE } from './help.js';
 
@@ -387,6 +388,38 @@ export function buildServer() {
     'Convert a quote into a submit_order-ready `lines` array (Stuller SKU lines only). Manual lines are returned under `excluded` since they can\'t be ordered via the API. Hand `lines` to submit_order (which still defaults to a dry run).',
     { cartId: cartIdArg },
     tool((a) => quoteToOrder(a))
+  );
+
+  // ---- Favorites (local file persistence; survives restarts) ----
+  server.tool(
+    'favorite_add',
+    'Save a SKU to your favorites for quick reorder later. Validated against the catalog (a typo SKU is rejected). Optional `label` (e.g. "bench solder"). Persists to a local JSON file — survives restarts. Per-user/local only.',
+    {
+      sku: z.string().describe('Stuller SKU to favorite'),
+      label: z.string().optional().describe('Optional friendly name'),
+    },
+    tool((a) => favoriteAdd(a))
+  );
+
+  server.tool(
+    'favorite_list',
+    'List your saved favorites. Pass `refresh: true` to re-pull live price + availability for each.',
+    { refresh: z.boolean().optional().describe('Re-price/restock-check each favorite live') },
+    tool((a) => favoriteList(a))
+  );
+
+  server.tool(
+    'favorite_remove',
+    'Remove a SKU from your favorites.',
+    { sku: z.string().describe('Stuller SKU to remove') },
+    tool((a) => favoriteRemove(a))
+  );
+
+  server.tool(
+    'favorites_to_quote',
+    'Load all saved favorites into a quote ("reorder my usuals") — each priced live. Then quote_view / quote_to_order / submit_order as usual.',
+    { cartId: z.string().optional().describe('Target quote name (default "default")') },
+    tool((a) => favoritesToQuote(a))
   );
 
   // ---- Orders ----

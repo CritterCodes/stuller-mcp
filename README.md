@@ -127,6 +127,8 @@ Point `command`/`args` at your checkout — useful for development:
 | `quote_remove_item` | read | Remove a line by SKU or index. |
 | `quote_clear` | read | Empty the quote. |
 | `quote_to_order` | read | Convert the quote into a `submit_order`-ready `lines` array. |
+| `favorite_add` / `favorite_list` / `favorite_remove` | read* | Save SKUs for quick reorder — persisted to a local JSON file (survives restarts). `favorite_list` can re-price live. |
+| `favorites_to_quote` | read* | Load all favorites into a quote ("reorder my usuals"). |
 | `submit_order` | **write** | Place an order. Dry-run by default; only transmits with `confirm: true`. |
 
 ### How searching works

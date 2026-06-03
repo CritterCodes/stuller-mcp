@@ -27,6 +27,10 @@ const EXPECTED_TOOLS = [
   'quote_remove_item',
   'quote_clear',
   'quote_to_order',
+  'favorite_add',
+  'favorite_list',
+  'favorite_remove',
+  'favorites_to_quote',
   'order_status',
   'submit_order',
 ];

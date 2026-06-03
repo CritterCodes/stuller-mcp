@@ -98,6 +98,10 @@ A live "order me 14k yellow hard plumb sheet solder" test FAILED: the orderable 
 - Lesson: for consumables/findings, scan the Series + keyword-filter; never conclude "not orderable" from guessed SKUs or one page.
 - [x] **find_products auto-routes consumables** — keyword search alone wasn't enough (the agent didn't reach for it, and "Solder" IS a ProductType so facets mis-fired, misclassifying "yellow" as StoneColor). Now find_products detects material nouns (solder/wire/bezel/tubing/sizing stock) → series + full-query keyword, bypassing facets; defaults to Orderable so $0 inactive parents don't crowd results. "14k yellow hard plumb sheet solder cadmium free" → 77433:P + 9882:P (yellow only). Finished jewelry still uses facets. 101 tests.
 
+## Favorites (2026-06-02)
+
+- [x] **Local-file favorites** — `favorite_add`/`favorite_list`/`favorite_remove`/`favorites_to_quote` (src/tools/favorites.js). Persists to `~/.stuller-mcp/favorites.json` (override `STULLER_FAVORITES_PATH`); no DB — fits the per-user/stdio model and survives restarts. add validates the SKU; list `refresh` re-prices live; favorites_to_quote = "reorder my usuals". Verified live (77433 + 0267 → quote $289.72). 104 tests. (Same multi-client caveat as quote/cache — documented.)
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.
