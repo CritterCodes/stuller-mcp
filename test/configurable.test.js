@@ -40,6 +40,13 @@ test('transformVirtual: display prefers the fully-set (finished) image', () => {
   assert.equal(v.display.primaryImage, 'http://img/with-stone.jpg', 'finished look wins');
 });
 
+test('configureProduct: validates required id + ring size before any network call', async () => {
+  const { configureProduct } = await import('../src/tools/configurable.js');
+  await assert.rejects(() => configureProduct({}), /productId.*required/i);
+  await assert.rejects(() => configureProduct({ productId: 1, ringSize: 0 }), /ringSize must be between/i);
+  await assert.rejects(() => configureProduct({ productId: 1, ringSize: 99 }), /ringSize must be between/i);
+});
+
 test('transformVirtual: setWith is de-duplicated (was repeating ~25×)', () => {
   const v = transformVirtual({
     SKU: 'X',

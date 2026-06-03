@@ -9,17 +9,26 @@ function stoneTitle(parts) {
 const DIAMONDS_PATH = '/v2/gem/diamonds';
 const LAB_GROWN_PATH = '/v2/gem/labgrowndiamonds';
 const GEMSTONES_PATH = '/v2/gem/gemstones';
+const MAX_PAGE_SIZE = 100; // hard cap so a giant pageSize can't overflow the response
+const MAX_FIT_TOLERANCE_MM = 5; // sanity ceiling for find_stones_by_dimensions
 
 // Build the shared DiamondRequest body from friendly options. Exported for tests.
 export function buildDiamondRequest(opts = {}) {
   const body = {};
 
-  // Ranges are sent as [min, max] decimal collections.
+  // Ranges are sent as [min, max] decimal collections. Swap inverted bounds so a
+  // "5 to 1 carat" query doesn't silently send a backwards range.
   if (opts.caratMin != null || opts.caratMax != null) {
-    body.SizeRange = [Number(opts.caratMin ?? 0), Number(opts.caratMax ?? 100)];
+    let lo = Number(opts.caratMin ?? 0);
+    let hi = Number(opts.caratMax ?? 100);
+    if (lo > hi) [lo, hi] = [hi, lo];
+    body.SizeRange = [lo, hi];
   }
   if (opts.priceMin != null || opts.priceMax != null) {
-    body.PriceRange = [Number(opts.priceMin ?? 0), Number(opts.priceMax ?? 1_000_000)];
+    let lo = Number(opts.priceMin ?? 0);
+    let hi = Number(opts.priceMax ?? 1_000_000);
+    if (lo > hi) [lo, hi] = [hi, lo];
+    body.PriceRange = [lo, hi];
   }
 
   if (opts.color?.length) body.Color = opts.color;
@@ -188,20 +197,24 @@ export function gemstoneCard(t) {
 }
 
 async function diamondSearch(path, opts) {
-  // Default to a small page — Stuller returns a large default of full stone
-  // objects that overflow token limits; callers page with nextPage.
-  const body = buildDiamondRequest({ ...opts, pageSize: opts.pageSize || 10 });
+  // Default to a small page and CAP it — Stuller returns large pages of full
+  // stone objects that overflow token limits; callers page with nextPage.
+  const body = buildDiamondRequest({ ...opts, pageSize: Math.min(opts.pageSize || 10, MAX_PAGE_SIZE) });
   const payload = await stullerRequest('POST', path, { body });
   // Natural diamonds nest under Diamonds; lab-grown under LabGrownDiamonds.
   const { items, nextPage, total } = unwrap(payload, ['Diamonds', 'diamonds', 'LabGrownDiamonds', 'labGrownDiamonds']);
   const stones = items.map(transformDiamond);
-  return {
+  const out = {
     count: stones.length,
     totalAvailable: total,
     nextPage,
     hasMore: Boolean(nextPage),
     diamonds: opts.full ? stones : stones.map(diamondCard),
   };
+  if (Number(opts.caratMin) > Number(opts.caratMax) || Number(opts.priceMin) > Number(opts.priceMax)) {
+    out.note = 'A min/max range was given backwards and has been swapped.';
+  }
+  return out;
 }
 
 /**
@@ -255,7 +268,7 @@ export async function searchGemstones(opts = {}) {
   if (opts.width != null) body.Width = Number(opts.width);
   if (opts.serialNumbers?.length) body.SerialNumbers = opts.serialNumbers.map(Number);
   if (opts.filters?.length) body.Filters = opts.filters;
-  body.PageSize = opts.pageSize || 10; // small default — full stone objects are heavy
+  body.PageSize = Math.min(opts.pageSize || 10, MAX_PAGE_SIZE); // small default + hard cap
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 
@@ -376,6 +389,8 @@ export async function findStonesByDimensions(opts = {}) {
   } = opts;
 
   if (!lengthMm) throw new Error('`lengthMm` (the target stone length in mm) is required.');
+  // Clamp tolerance to a sane ceiling — a huge tolerance makes everything "fit".
+  const tol = Math.min(Number(tolerance) || 0.3, MAX_FIT_TOLERANCE_MM);
   const targetL = Number(lengthMm);
   const targetW = widthMm != null ? Number(widthMm) : targetL; // round: width == length
 
@@ -414,7 +429,7 @@ export async function findStonesByDimensions(opts = {}) {
       const dW = Math.abs(dims.width - targetW);
       return { stone, lengthMm: dims.length, widthMm: dims.width, dL, dW, deviationMm: dL + dW };
     })
-    .filter((c) => c && c.dL <= tolerance && c.dW <= tolerance)
+    .filter((c) => c && c.dL <= tol && c.dW <= tol)
     .sort((a, b) => a.deviationMm - b.deviationMm)
     .slice(0, maxResults)
     .map((c) => ({
@@ -428,7 +443,7 @@ export async function findStonesByDimensions(opts = {}) {
     }));
 
   return {
-    target: { shape: shape ?? null, lengthMm: targetL, widthMm: targetW, toleranceMm: tolerance },
+    target: { shape: shape ?? null, lengthMm: targetL, widthMm: targetW, toleranceMm: tol },
     source,
     scanned,
     capped: Boolean(nextPage && scanned >= maxScan),

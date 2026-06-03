@@ -67,6 +67,13 @@ export async function quoteAdd(opts = {}) {
     const existing = cart.find((l) => l.source === 'stuller' && l.sku === line.sku);
     if (existing) existing.quantity += quantity;
     else cart.push(line);
+
+    // Warn (but still allow) when adding something that can't actually be ordered.
+    if (line.orderable === false || line.unitPrice == null || line.unitPrice === 0) {
+      const summary = summarizeCart(cart, cartId);
+      summary.warning = `Added ${line.sku}, but it is ${line.orderable === false ? 'not orderable' : 'unpriced/$0'} — it likely can't be ordered. Review before quoting.`;
+      return summary;
+    }
   } else {
     if (!opts.description || opts.unitPrice == null) {
       throw new Error('Provide either `sku`, or both `description` and `unitPrice` for a manual line.');

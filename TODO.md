@@ -70,6 +70,18 @@ From a full live QA sweep:
 - [x] **show_product double size-token** — sizedImageUrl now strips an existing `?`/`&`-attached token before appending (regression-tested).
 - Note: a Stuller gemstone record reported width 511mm (their bad data); surfaced as-is.
 
+## 5th-sweep hardening (2026-06-02)
+
+- [x] **pageSize cap** — search_products/diamonds/gemstones capped at 100, virtual at 25 (pageSize:100000 no longer overflows).
+- [x] **Giant facet lists truncated** — advanced_product_filters facetType caps at 200 values + a truncated note (StoneSize 1082 → 11.5K, was 89K).
+- [x] **Inverted ranges swapped** — buildDiamondRequest swaps caratMin>caratMax / priceMin>priceMax + result note.
+- [x] **submit_order validates SKUs at preview** — flags `unknownSkus`; refuses to transmit (confirm:true) an order with bad SKUs.
+- [x] **Graceful configure/get_configured errors** — configure_product catches Stuller 500 → "may not be a configurable mounting"; get_configured_product → clean "not found" (was null-deref crash).
+- [x] **get_shipment** bad id → `{found:false, message}` (was bare null).
+- [x] **configure_product ring-size validation** — must be 1–20.
+- [x] **find_stones_by_dimensions tolerance ceiling** — clamped to 5mm.
+- [x] **Quote warns** on adding an unorderable/$0 line.
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.

@@ -1,4 +1,5 @@
 import { stullerRequest } from '../stuller/client.js';
+import { pricingAvailability } from './products.js';
 
 const ORDERS_PATH = '/v2/orders';
 const SUBMIT_ORDER_PATH = '/v2/orders/submitorder';
@@ -81,13 +82,38 @@ export async function submitOrder(spec = {}, confirm = false) {
     };
   }
 
+  // Validate every line SKU against the live catalog so a bogus SKU can't slip
+  // through preview into a confirmed order.
+  const skus = [...new Set(lines.map((l) => l.ItemNumber))];
+  let unknownSkus = [];
+  try {
+    const { items } = await pricingAvailability({ skus });
+    const found = new Set(items.map((i) => String(i.itemNumber)));
+    unknownSkus = skus.filter((s) => !found.has(String(s)));
+  } catch {
+    unknownSkus = []; // if the check itself fails, don't block — Stuller validates on submit
+  }
+
   if (!confirm) {
     return {
       action: 'preview',
       message:
-        'Dry run — nothing sent to Stuller. Review the order body below, then call again with confirm: true to transmit.',
+        'Dry run — nothing sent to Stuller. Review the order body below, then call again with confirm: true to transmit.' +
+        (unknownSkus.length ? ` WARNING: ${unknownSkus.length} SKU(s) were NOT found in the catalog and will be rejected.` : ''),
       wouldPostTo: SUBMIT_ORDER_PATH,
       lineCount: lines.length,
+      unknownSkus,
+      body,
+    };
+  }
+
+  // Refuse to transmit an order containing unknown SKUs.
+  if (unknownSkus.length) {
+    return {
+      action: 'rejected',
+      reason: 'unknown_skus',
+      message: `Not transmitted — these SKUs are not in the Stuller catalog: ${unknownSkus.join(', ')}. Fix the lines and retry.`,
+      unknownSkus,
       body,
     };
   }

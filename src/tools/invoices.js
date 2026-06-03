@@ -118,9 +118,12 @@ export async function listInvoices(opts = {}) {
  */
 export async function getShipment(opts = {}) {
   if (opts.shipmentHeaderId == null) throw new Error('`shipmentHeaderId` is required.');
-  const payload = await stullerRequest('POST', SHIPMENT_PATH, {
-    body: { ShipmentHeaderId: Number(opts.shipmentHeaderId) },
-  });
+  const id = Number(opts.shipmentHeaderId);
+  const payload = await stullerRequest('POST', SHIPMENT_PATH, { body: { ShipmentHeaderId: id } });
+  // Stuller returns a bare null for an unknown id — surface a clear message.
+  if (payload == null || (typeof payload === 'object' && Object.keys(payload).length === 0)) {
+    return { found: false, shipmentHeaderId: id, message: `No shipment found for header id ${id}.` };
+  }
   return payload;
 }
 

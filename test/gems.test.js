@@ -83,6 +83,11 @@ test('buildDiamondRequest: empty opts → empty body', () => {
   assert.deepEqual(buildDiamondRequest({}), {});
 });
 
+test('buildDiamondRequest: inverted ranges are swapped, not sent backwards', () => {
+  assert.deepEqual(buildDiamondRequest({ caratMin: 5, caratMax: 1 }).SizeRange, [1, 5]);
+  assert.deepEqual(buildDiamondRequest({ priceMin: 9000, priceMax: 500 }).PriceRange, [500, 9000]);
+});
+
 // ---- parseMeasurements ----
 
 test('parseMeasurements: "L x W x H" → length/width', () => {

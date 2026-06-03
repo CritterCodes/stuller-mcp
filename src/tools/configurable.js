@@ -92,7 +92,7 @@ export async function searchVirtualProducts(opts = {}) {
   if (opts.filter?.length) body.Filter = opts.filter;
   if (opts.advancedProductFilters?.length) body.AdvancedProductFilters = opts.advancedProductFilters;
   body.Include = opts.include?.length ? opts.include : DEFAULT_INCLUDE;
-  body.PageSize = opts.pageSize || 3; // virtual products are heavy (config model) — default a tiny page
+  body.PageSize = Math.min(opts.pageSize || 3, 25); // heavy (config model) — tiny default + hard cap
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 
@@ -122,6 +122,9 @@ export async function searchVirtualProducts(opts = {}) {
  */
 export async function configureProduct(opts = {}) {
   if (!opts.productId) throw new Error('`productId` (the base product id) is required.');
+  if (opts.ringSize != null && !(Number(opts.ringSize) >= 1 && Number(opts.ringSize) <= 20)) {
+    throw new Error('`ringSize` must be between 1 and 20 (US ring sizes).');
+  }
 
   const body = {
     ProductId: Number(opts.productId),
@@ -152,7 +155,19 @@ export async function configureProduct(opts = {}) {
     }));
   }
 
-  const c = await stullerRequest('POST', CONFIGURE_PATH, { body });
+  let c;
+  try {
+    c = await stullerRequest('POST', CONFIGURE_PATH, { body });
+  } catch (err) {
+    // Stuller 500s when the id isn't a configurable base product. Surface a clear
+    // pointer instead of leaking the raw error.
+    throw new Error(
+      `Could not configure product ${body.ProductId}. It may not be a configurable mounting — use a baseProductId from search_virtual_products (not a ConfigurationModel.Id or a plain SKU's product id). (${err.message})`
+    );
+  }
+  if (!c || typeof c !== 'object') {
+    throw new Error(`Product ${body.ProductId} is not configurable (empty response).`);
+  }
   return {
     productId: body.ProductId,
     quantity: body.Quantity,
@@ -181,6 +196,9 @@ export async function getConfiguredProduct(opts = {}) {
   const body = { ConfigurationId: Number(opts.configurationId) };
   if (opts.include?.length) body.Include = opts.include;
   const c = await stullerRequest('POST', CONFIGURED_PATH, { body });
+  if (!c || typeof c !== 'object' || (c.SKU == null && c.Id == null)) {
+    throw new Error(`No configured product found for configuration id ${body.ConfigurationId}.`);
+  }
   return {
     configurationId: body.ConfigurationId,
     sku: c.SKU ?? null,

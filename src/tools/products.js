@@ -87,9 +87,10 @@ export async function searchProducts(opts = {}) {
   // Default to a full include so results carry SKU/price/images; without it the
   // search endpoint returns sparse records (no price). Callers can override.
   body.Include = opts.include?.length ? opts.include : ['All'];
-  // Default to a SMALL page. Stuller defaults to 500 full products (~MBs), which
-  // overflows token limits — callers page with nextPage instead.
-  body.PageSize = opts.pageSize || 10;
+  // Default to a SMALL page and CAP it. Stuller defaults to 500 full products
+  // (~MBs) and honors any pageSize, so an unbounded request overflows token
+  // limits — callers page with nextPage instead.
+  body.PageSize = Math.min(opts.pageSize || 10, 100);
   if (opts.page) body.Page = opts.page;
   if (opts.nextPage) body.NextPage = opts.nextPage;
 
@@ -196,7 +197,16 @@ export async function advancedProductFiltersSummary(opts = {}) {
     if (!f) {
       throw new Error(`Unknown facetType "${opts.facetType}". Available: ${facets.map((x) => x.type).join(', ')}.`);
     }
-    return { facetType: f.type, valueCount: f.valueCount, values: f.values };
+    // Some facets (e.g. StoneSize ~1082 values) are huge — truncate to stay under
+    // token limits and tell the caller how many were omitted.
+    const CAP = 200;
+    const values = f.values.slice(0, CAP);
+    const out = { facetType: f.type, valueCount: f.valueCount, values };
+    if (f.valueCount > CAP) {
+      out.truncated = true;
+      out.note = `Showing the first ${CAP} of ${f.valueCount} values. Scope with categoryIds/series to narrow, or just use find_products with a plain-language query.`;
+    }
+    return out;
   }
 
   return {
