@@ -82,6 +82,14 @@ From a full live QA sweep:
 - [x] **find_stones_by_dimensions tolerance ceiling** — clamped to 5mm.
 - [x] **Quote warns** on adding an unorderable/$0 line.
 
+## Pre-publish gap-closing (2026-06-02)
+
+- [x] **Order required-field validation** — submit_order preview now reports `missingFields` (shipToAddress/contact/payment) + `warnings`; on confirm, surfaces Stuller's `Errors` collection (failures come back 200 with Errors, not an HTTP status). NOTE: the actual transmit/happy-path is still unproven (never placed a live order).
+- [x] **Request-shape unit tests** — test/requests.test.js mocks fetch and asserts the exact bodies for getProducts/searchProducts/searchDiamonds/labgrown/searchGemstones/listInvoices/configureProduct/submitOrder (guards the tool layer against silent drift). 99 tests total.
+- [x] **Publish hygiene** — `npm audit` = 0 vulns; `npm publish --dry-run` = 17 files / 44KB, clean (no tests/scripts/.env/node_modules; `files` whitelist verified).
+- [x] **Hosted-cart caveat** — README "Deployment note": run per-user over stdio; quote/cache state is process-global and NOT multi-client-isolated.
+- [ ] **Still latent:** per-session isolation for quote/cache if ever hosted; live order happy-path unverified (by design — no test order placed); pagination-to-exhaustion unverified.
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.

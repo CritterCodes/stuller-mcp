@@ -219,8 +219,10 @@ use `discover_categories({ productType:"Earrings", contains:"stud" })` → pick 
 ## Safety model
 
 - **Reads** (everything except `submit_order` — products, stones, configuration, `order_status`, `list_invoices`, `get_shipment`, …) never modify anything.
-- **`submit_order` is the only write tool.** It defaults to a **dry run** — it returns the exact request body it *would* send and transmits nothing until you call it again with `confirm: true`.
+- **`submit_order` is the only write tool.** It defaults to a **dry run** — it returns the exact request body it *would* send and transmits nothing until you call it again with `confirm: true`. The dry run validates line SKUs against the catalog and flags missing recipient/contact/payment fields; a confirmed order with unknown SKUs is refused.
 - Set `STULLER_DISABLE_ORDERING=true` to hard-disable order submission entirely, regardless of the `confirm` flag.
+
+> **Deployment note:** this server is designed to run **per-user over stdio** (one process per client). The quote builder and response cache keep state in process memory, which is *not* isolated between users — **do not host a single shared instance for multiple clients** without adding per-session isolation first. Each user should run their own instance with their own credentials.
 
 ---
 

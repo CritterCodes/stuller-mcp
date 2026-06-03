@@ -94,15 +94,27 @@ export async function submitOrder(spec = {}, confirm = false) {
     unknownSkus = []; // if the check itself fails, don't block — Stuller validates on submit
   }
 
+  // Stuller's submitorder typically requires a recipient, contact, and payment.
+  // We can't know an account's exact rules (it may use defaults), so we don't
+  // hard-block — but we surface what's missing so an order isn't sent half-built.
+  const RECOMMENDED = { ShipToAddress: 'shipToAddress', Contact: 'contact', Payment: 'payment' };
+  const missingFields = Object.entries(RECOMMENDED)
+    .filter(([k]) => body[k] == null)
+    .map(([, friendly]) => friendly);
+
   if (!confirm) {
+    const warnings = [];
+    if (unknownSkus.length) warnings.push(`${unknownSkus.length} SKU(s) not found in the catalog and will be rejected: ${unknownSkus.join(', ')}.`);
+    if (missingFields.length) warnings.push(`Missing fields usually required by Stuller: ${missingFields.join(', ')}. The order may be rejected without them.`);
     return {
       action: 'preview',
       message:
-        'Dry run — nothing sent to Stuller. Review the order body below, then call again with confirm: true to transmit.' +
-        (unknownSkus.length ? ` WARNING: ${unknownSkus.length} SKU(s) were NOT found in the catalog and will be rejected.` : ''),
+        'Dry run — nothing sent to Stuller. Review the body below; supply any missing fields, then call again with confirm: true to transmit.',
       wouldPostTo: SUBMIT_ORDER_PATH,
       lineCount: lines.length,
       unknownSkus,
+      missingFields,
+      warnings,
       body,
     };
   }
@@ -119,5 +131,13 @@ export async function submitOrder(spec = {}, confirm = false) {
   }
 
   const result = await stullerRequest('POST', SUBMIT_ORDER_PATH, { body });
-  return { action: 'submitted', request: { lineCount: lines.length }, response: result };
+  // Stuller signals submit failures via an Errors collection rather than HTTP status.
+  const errors = result?.Errors || result?.errors || [];
+  return {
+    action: errors.length ? 'failed' : 'submitted',
+    request: { lineCount: lines.length },
+    ...(missingFields.length ? { missingFields } : {}),
+    ...(errors.length ? { errors } : {}),
+    response: result,
+  };
 }
