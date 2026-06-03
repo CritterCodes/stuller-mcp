@@ -94,7 +94,7 @@ export function buildServer() {
   // ---- Products: search ----
   server.tool(
     'find_products',
-    'Natural-language product search. Give a plain phrase like "white gold diamond stud earrings" or "sterling silver bracelet in stock" and it resolves the terms against Stuller\'s live facet vocabulary (so you don\'t need to know exact values), then runs the search. Returns `resolvedFilters` (how it interpreted the query), `appliedFilters`, and `unmatchedTerms` (words it could not map — refine or use advanced_product_filters for those). Best starting point for catalog discovery; use search_products directly when you already know exact facet values. Re-check pricing on chosen SKUs before quoting.',
+    'Natural-language product search and the best starting point. Give a plain phrase ("white gold diamond stud earrings", "14k yellow hard plumb sheet solder", "sterling silver bracelet in stock"). It auto-routes: consumables/materials (solder, wire, bezel, tubing, sizing stock) go to a series + full-query keyword scan; everything else resolves against the facet vocabulary. Defaults to Orderable so inactive/$0 parents don\'t crowd out buyable items. Returns `resolvedFilters`/`strategy`, `unmatchedTerms`, and lean cards. Re-check pricing on chosen SKUs before quoting.',
     {
       query: z.string().describe('Plain-language description, e.g. "yellow gold rope chain"'),
       filter: z

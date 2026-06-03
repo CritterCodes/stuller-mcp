@@ -115,6 +115,29 @@ export async function searchProducts(opts = {}) {
   };
 }
 
+// Try each unmatched alphabetic noun as a product Series + keyword-filter by the
+// query. Returns the first series that yields matches (or null). Bounded.
+async function tryConsumableSeries(query, unmatchedTerms, appliedFilters, pageSize, full) {
+  const candidates = (unmatchedTerms || []).filter((t) => /^[a-z]{4,}$/.test(t)).slice(0, 3);
+  for (const term of candidates) {
+    const series = term.charAt(0).toUpperCase() + term.slice(1);
+    try {
+      const res = await searchProductsByKeyword({
+        series: [series],
+        filter: appliedFilters?.length ? appliedFilters : ['Orderable'],
+        keyword: query,
+        pageSize,
+        full,
+        maxScan: 400,
+      });
+      if (res.count > 0) return { series, ...res };
+    } catch {
+      /* unknown series → skip */
+    }
+  }
+  return null;
+}
+
 // Keyword search within a structural slice: page the selector (series/category/
 // filter) and keep products whose description contains ALL the keyword terms.
 async function searchProductsByKeyword(opts) {
@@ -493,6 +516,23 @@ export function resolveProductFacets(query, facets = []) {
   return { resolved, detectedFilters, unmatchedTerms: [...new Set(unmatchedTerms)] };
 }
 
+// Material/consumable categories whose Stuller Series name equals the item word.
+// These bypass facet resolution (which misclassifies their metal colors).
+const CONSUMABLE_SERIES = [
+  ['sizing stock', 'Sizing Stock'],
+  ['solder', 'Solder'],
+  ['wire', 'Wire'],
+  ['bezel', 'Bezel'],
+  ['tubing', 'Tubing'],
+];
+function detectConsumableSeries(query) {
+  const q = ` ${String(query).toLowerCase()} `;
+  for (const [noun, series] of CONSUMABLE_SERIES) {
+    if (new RegExp(`\\b${noun.replace(/\s+/g, '\\s+')}s?\\b`).test(q)) return series;
+  }
+  return null;
+}
+
 /**
  * Natural-language product search. Resolves a phrase like
  * "white gold diamond stud earrings" against the live facet vocabulary, then
@@ -502,6 +542,30 @@ export function resolveProductFacets(query, facets = []) {
  */
 export async function findProducts({ query, filter, pageSize, page, nextPage, full } = {}) {
   if (!query || !query.trim()) throw new Error('`query` is required.');
+
+  // Consumables/materials fast-path. These categories aren't modeled by the facet
+  // vocabulary, and the resolver misclassifies their metal colors (e.g. "yellow"
+  // → StoneColor when "gold" is absent). For them the product Series name equals
+  // the material word and the full spec lives in the description — so match the
+  // series and keyword-filter by the WHOLE query, bypassing facets entirely.
+  const series = detectConsumableSeries(query);
+  if (series) {
+    const kw = await searchProductsByKeyword({
+      series: [series],
+      filter: filter?.length ? filter : ['Orderable'],
+      keyword: query,
+      pageSize,
+      full,
+      maxScan: 400,
+    });
+    return {
+      query,
+      matched: kw.count > 0,
+      strategy: `series+keyword ("${series}")`,
+      note: `"${series}" is a consumable/material category — matched by series + full-query keyword over the description (facets don't model these well). Re-check the SKU with pricing_availability before ordering.`,
+      ...kw,
+    };
+  }
 
   const { facets } = await advancedProductFilters({});
   const { resolved, detectedFilters, unmatchedTerms } = resolveProductFacets(query, facets);
@@ -523,6 +587,28 @@ export async function findProducts({ query, filter, pageSize, page, nextPage, fu
   const applied = hasProductType ? resolved.filter((r) => !LOOSE_STONE_FACETS.has(r.type)) : resolved;
   const setAside = hasProductType ? resolved.filter((r) => LOOSE_STONE_FACETS.has(r.type)) : [];
 
+  // Consumables/findings fallback: when no finished ProductType resolved, an
+  // unmatched noun is often a product Series (Solder, Wire, Sizing Stock). Try it
+  // as a series + keyword-filter the description — this is what makes "14k yellow
+  // gold solder" actually find the orderable SKU instead of dead-ending.
+  if (!hasProductType) {
+    const fb = await tryConsumableSeries(query, unmatchedTerms, appliedFilters, pageSize, full);
+    if (fb && fb.count > 0) {
+      return {
+        query,
+        matched: true,
+        strategy: `series+keyword ("${fb.series}")`,
+        resolvedFilters: applied.map((r) => ({ type: r.type, values: r.values.map((v) => v.displayValue) })),
+        unmatchedTerms,
+        note: `No finished-goods ProductType matched, so this scanned the "${fb.series}" series and keyword-filtered descriptions — the right path for consumables/findings (solder, wire, sizing stock). Re-check the SKU with pricing_availability before ordering.`,
+        count: fb.count,
+        hasMore: fb.hasMore,
+        scanned: fb.scanned,
+        products: fb.products,
+      };
+    }
+  }
+
   if (!applied.length && !appliedFilters.length) {
     return {
       query,
@@ -542,9 +628,24 @@ export async function findProducts({ query, filter, pageSize, page, nextPage, fu
     Values: r.values.map((v) => ({ DisplayValue: v.displayValue, Value: v.value })),
   }));
 
+  // Leftover descriptive words (e.g. "hard plumb sheet cadmium free") that the
+  // facets didn't capture become a keyword filter over the faceted slice. We also
+  // re-add the single metal color (consumed by MetalQuality) because some
+  // categories — solder, etc. — don't actually honor the MetalQuality facet, so
+  // "yellow" must be enforced in the description or rose/white leak in.
+  const metalValues = applied.find((r) => r.type === 'MetalQuality')?.values.map((v) => v.displayValue.toLowerCase()) || [];
+  const COLORS = ['yellow', 'white', 'rose', 'green', 'sterling', 'platinum', 'palladium'];
+  const colorsPresent = COLORS.filter((c) => metalValues.length && metalValues.every((v) => v.includes(c)));
+  const keywordTerms = [...(unmatchedTerms || []).filter((t) => /^[a-z0-9]{2,}$/.test(t)), ...colorsPresent];
+  const keyword = [...new Set(keywordTerms)].join(' ');
+  const useKeyword = keyword.length > 0;
+
+  // find_products is a "find me products" tool — default to Orderable so the
+  // inactive $0 bulk-dwt parents don't crowd out real, buyable items.
   const results = await searchProducts({
     advancedProductFilters: advancedFilters.length ? advancedFilters : undefined,
-    filter: appliedFilters.length ? appliedFilters : undefined,
+    filter: appliedFilters.length ? appliedFilters : ['Orderable'],
+    keyword: useKeyword ? keyword : undefined,
     pageSize,
     page,
     nextPage,

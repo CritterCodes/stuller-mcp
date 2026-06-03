@@ -92,6 +92,28 @@ test('configureProduct sends ProductId + RingSize', async () => {
   assert.equal(b.RingSize, 7);
 });
 
+test('find_products routes consumables (solder) to a series+keyword scan, not facets', async () => {
+  globalThis.fetch = async (url, opts) => {
+    const path = new URL(url).pathname;
+    calls.push({ path });
+    if (path.includes('/products')) {
+      const Products = [
+        { SKU: 'SOLDER:77433:P', Description: '14K Yellow Gold Cadmium Free Hard Plumb Solder Sheet', Orderable: true, Price: { Value: 144.86 } },
+        { SKU: 'SOLDER:9947:P', Description: '14K Rose Gold Cadmium Free Hard Plumb Solder Sheet', Orderable: true, Price: { Value: 145.31 } },
+      ];
+      return { ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ Products }) };
+    }
+    return { ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => '{}' };
+  };
+  const r = await products.findProducts({ query: '14k yellow hard plumb sheet solder cadmium free' });
+  assert.match(r.strategy, /Solder/);
+  // "yellow" in the full-query keyword keeps the rose sheet out.
+  assert.equal(r.count, 1);
+  assert.equal(r.products[0].itemNumber, 'SOLDER:77433:P');
+  // Must not have touched advancedproductfilters (facet path bypassed).
+  assert.equal(calls.some((c) => c.path.includes('advancedproductfilters')), false);
+});
+
 test('searchProducts keyword filters descriptions over a scanned slice (the solder fix)', async () => {
   // One page of mixed products; keyword must keep only the all-terms match.
   globalThis.fetch = async (url, opts) => {

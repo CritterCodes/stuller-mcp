@@ -96,6 +96,7 @@ A live "order me 14k yellow hard plumb sheet solder" test FAILED: the orderable 
 
 - [x] **Keyword search** — `search_products` now takes a `keyword` (+ `maxScan`): pages a series/category slice and filters descriptions for ALL terms client-side. `{ series:["Solder"], filter:["Orderable"], keyword:"14k yellow hard plumb sheet cadmium free" }` → returns 77433:P AND 9882:P. Documented in get_started as the consumables/findings path (Series name = item word; don't guess bare SKUs). Request-shape test added. 100 tests.
 - Lesson: for consumables/findings, scan the Series + keyword-filter; never conclude "not orderable" from guessed SKUs or one page.
+- [x] **find_products auto-routes consumables** — keyword search alone wasn't enough (the agent didn't reach for it, and "Solder" IS a ProductType so facets mis-fired, misclassifying "yellow" as StoneColor). Now find_products detects material nouns (solder/wire/bezel/tubing/sizing stock) → series + full-query keyword, bypassing facets; defaults to Orderable so $0 inactive parents don't crowd results. "14k yellow hard plumb sheet solder cadmium free" → 77433:P + 9882:P (yellow only). Finished jewelry still uses facets. 101 tests.
 
 ## Parked ideas
 
