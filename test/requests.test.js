@@ -92,6 +92,22 @@ test('configureProduct sends ProductId + RingSize', async () => {
   assert.equal(b.RingSize, 7);
 });
 
+test('searchProducts keyword filters descriptions over a scanned slice (the solder fix)', async () => {
+  // One page of mixed products; keyword must keep only the all-terms match.
+  globalThis.fetch = async (url, opts) => {
+    calls.push({ path: new URL(url).pathname });
+    const Products = [
+      { SKU: 'SOLDER:77433:P', Description: '14K Yellow Gold Cadmium Free Hard Plumb Solder Sheet', Orderable: true, Price: { Value: 144.86 } },
+      { SKU: 'SOLDER:0267:P', Description: '14K Yellow Gold Cadmium Free Ultra Easy Plumb Solder Sheet', Orderable: true, Price: { Value: 144.86 } },
+      { SKU: 'X:1', Description: 'Sterling Silver Bracelet', Orderable: true, Price: { Value: 10 } },
+    ];
+    return { ok: true, status: 200, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ Products }) };
+  };
+  const r = await products.searchProducts({ series: ['Solder'], filter: ['Orderable'], keyword: '14k yellow hard plumb sheet cadmium free' });
+  assert.equal(r.count, 1, 'only the Hard sheet matches all terms');
+  assert.equal(r.products[0].itemNumber, 'SOLDER:77433:P');
+});
+
 test('submitOrder preview assembles Lines + reports missing fields, sends nothing to submitorder', async () => {
   mockFetch();
   const out = await orders.submitOrder({ lines: [{ sku: 'X', quantity: 2 }] }, false);

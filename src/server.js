@@ -123,9 +123,11 @@ export function buildServer() {
 
   server.tool(
     'search_products',
-    'Filter the Stuller catalog and page through results. This is a STRUCTURAL filter, not free-text keyword search: narrow by `series` (e.g. ["309"]), `categoryIds`, `productIds`, `filter` flags, or `advancedProductFilters`. If you don\'t already know valid facet values, call advanced_product_filters FIRST (or just use find_products). Returns LEAN product cards (itemNumber, title, price, availability, primaryImage, categoryIds) by default and a small page (10) — page with `nextPage`, set `full: true` for complete objects, and re-check chosen SKUs with pricing_availability/product_detail before quoting.',
+    'Filter the Stuller catalog and page through results. Narrow by `series`, `categoryIds`, `productIds`, `filter` flags, or `advancedProductFilters`. **`keyword`** adds description-text filtering over the scanned slice — essential for consumables/findings (solder, wire, sizing stock) where the Series name equals the item word and the spec lives in the description: e.g. `{ series:["Solder"], filter:["Orderable"], keyword:"14k yellow hard plumb sheet cadmium free" }` finds the right SKU. Returns LEAN cards (itemNumber, title, price, availability, primaryImage, categoryIds), small page (10); page with `nextPage`, `full:true` for complete objects, and re-check SKUs with pricing_availability before quoting.',
     {
-      series: z.array(z.string()).optional().describe('Series numbers, e.g. ["309", "1601"]'),
+      keyword: z.string().optional().describe('Words that must ALL appear in the product description; filtered client-side over a series/category scan. Pair with a selector (e.g. series:["Solder"]).'),
+      maxScan: z.number().int().positive().optional().describe('Max products to scan when keyword filtering (default 400)'),
+      series: z.array(z.string()).optional().describe('Series numbers (e.g. ["309"]) or names (e.g. ["Solder"])'),
       categoryIds: z.array(z.number().int()).optional().describe('Stuller category IDs'),
       productIds: z.array(z.number().int()).optional().describe('Stuller product IDs'),
       filter: z

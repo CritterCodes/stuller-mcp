@@ -29,7 +29,8 @@ You need a Stuller **developer login** (API-only credentials, not your stuller.c
 2. **By faceted filters** — to discover/narrow:
    - \`advanced_product_filters\` — lists the facets you can filter on (ProductType, MetalQuality, StoneFamily, StoneShape, …) and their valid values
    - \`search_products\` — pass a chosen facet as \`advancedProductFilters\`, optionally with \`filter\` flags (InStock, Orderable, OnPriceList, Finished, BestSeller)
-3. **By merchandising category** — for finished jewelry facets can't express (e.g. "diamond stud earrings" — stone facets don't AND with a finished ProductType):
+3. **Consumables / findings (solder, wire, sizing stock, jump rings, etc.)** — these aren't in the facet vocabulary. Their product **Series name equals the item word** and the spec is in the description, so use \`search_products\` with a series + keyword: e.g. \`{ series:["Solder"], filter:["Orderable"], keyword:"14k yellow hard plumb sheet cadmium free" }\`. The \`keyword\` filters descriptions client-side over the scan. (Don't guess bare SKUs — the obvious-looking ones are often inactive bulk-dwt parents.)
+4. **By merchandising category** — for finished jewelry facets can't express (e.g. "diamond stud earrings" — stone facets don't AND with a finished ProductType):
    - \`discover_categories\` (e.g. \`productType:"Earrings", contains:"stud"\`) → pick a category \`id\` → \`search_products\` with \`categoryIds:[id]\`. Note: category coverage depends on how the account's catalog is tagged — if \`contains\` matches nothing it returns the categories that WERE found (under otherCategories) so you can still pick one.
 
    Page large result sets with the returned \`nextPage\` token (\`hasMore\` tells you when to stop).

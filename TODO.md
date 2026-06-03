@@ -90,6 +90,13 @@ From a full live QA sweep:
 - [x] **Hosted-cart caveat** — README "Deployment note": run per-user over stdio; quote/cache state is process-global and NOT multi-client-isolated.
 - [ ] **Still latent:** per-session isolation for quote/cache if ever hosted; live order happy-path unverified (by design — no test order placed); pagination-to-exhaustion unverified.
 
+## Real-task failure → fix (2026-06-02)
+
+A live "order me 14k yellow hard plumb sheet solder" test FAILED: the orderable SKU (SOLDER:77433:P, in stock, $144.86) was never surfaced — no keyword search, solder isn't a faceted ProductType, and the fallback was SKU-guessing (hit inactive bulk-dwt parents) + a single-page series scan that missed it.
+
+- [x] **Keyword search** — `search_products` now takes a `keyword` (+ `maxScan`): pages a series/category slice and filters descriptions for ALL terms client-side. `{ series:["Solder"], filter:["Orderable"], keyword:"14k yellow hard plumb sheet cadmium free" }` → returns 77433:P AND 9882:P. Documented in get_started as the consumables/findings path (Series name = item word; don't guess bare SKUs). Request-shape test added. 100 tests.
+- Lesson: for consumables/findings, scan the Series + keyword-filter; never conclude "not orderable" from guessed SKUs or one page.
+
 ## Parked ideas
 
 - **Voice "bench assistant"** — hands-free wake-word device (Pi/tablet) → STT → Claude agent on this MCP → TTS, for finding/ordering at the bench. The MCP is the backbone; NL search + dry-run order gate fit voice well. Start with a push-to-talk Phase-0 prototype. Parked pending MCP refinement.

@@ -68,6 +68,13 @@ export async function pricingAvailability({ skus } = {}) {
  * }} opts
  */
 export async function searchProducts(opts = {}) {
+  // Keyword path: Stuller has no free-text search, but for consumables/findings
+  // (solder, wire, sizing stock) the product Series name often equals the item
+  // word, and the description carries the spec. Scan a structural slice and
+  // filter descriptions by the keyword terms client-side. This is what makes
+  // "find me orderable 14k yellow hard plumb sheet solder" actually resolve.
+  if (opts.keyword) return searchProductsByKeyword(opts);
+
   const body = {};
   if (opts.series?.length) body.Series = opts.series;
   if (opts.categoryIds?.length) body.CategoryIds = opts.categoryIds;
@@ -105,6 +112,42 @@ export async function searchProducts(opts = {}) {
     // Lean cards by default to stay under token limits; `full: true` returns the
     // complete product objects (heavy). For one item, prefer product_detail.
     products: opts.full ? transformed : transformed.map(productCard),
+  };
+}
+
+// Keyword search within a structural slice: page the selector (series/category/
+// filter) and keep products whose description contains ALL the keyword terms.
+async function searchProductsByKeyword(opts) {
+  const terms = String(opts.keyword)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 2);
+  const want = Math.min(opts.pageSize || 10, 50);
+  const maxScan = Math.min(opts.maxScan || 400, 1000);
+  const matched = [];
+  let nextPage;
+  let scanned = 0;
+  let pages = 0;
+  do {
+    const res = await searchProducts({ ...opts, keyword: undefined, pageSize: 100, nextPage });
+    for (const c of res.products) {
+      const hay = `${c.title || ''} ${c.itemNumber || ''}`.toLowerCase();
+      if (terms.every((t) => hay.includes(t))) matched.push(c);
+    }
+    scanned += res.products.length;
+    nextPage = res.nextPage;
+    pages += 1;
+  } while (nextPage && scanned < maxScan && pages < 10 && matched.length < want);
+
+  return {
+    keyword: opts.keyword,
+    matchedTerms: terms,
+    scanned,
+    count: Math.min(matched.length, want),
+    hasMore: Boolean(nextPage),
+    note:
+      'Keyword-filtered client-side over a category/series scan (Stuller has no free-text search). Narrow with series/categoryIds + filter:["Orderable"] for best results; raise maxScan if you expect more.',
+    products: matched.slice(0, want),
   };
 }
 
